@@ -1,0 +1,74 @@
+#!/command/with-contenv sh
+# Copiloto — autoconfiguracao no boot (roda depois da base popular /opt/data).
+set -e
+DATA=/opt/data
+CFG="$DATA/config.yaml"
+cd "$DATA" 2>/dev/null || true
+mkdir -p "$DATA/whatsapp"
+
+if [ ! -f "$DATA/.copiloto_configured" ]; then
+  H=$(/opt/hermes/.venv/bin/python -c "from plugins.dashboard_auth.basic import hash_password; print('H4SH='+hash_password('${DASH_PASS:-TroqueASenha2026}'))" 2>/dev/null | sed -n 's/^H4SH=//p' | tail -1)
+  S=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+  cat > "$CFG" <<CFG
+model:
+  provider: openai-api
+  default: gpt-5
+stt:
+  enabled: true
+  provider: openai
+  openai:
+    model: whisper-1
+approvals:
+  mode: smart
+dashboard:
+  basic_auth:
+    username: ${DASH_USER:-admin}
+    password_hash: "$H"
+    secret: "$S"
+plugins:
+  enabled:
+  - dashboard_auth/basic
+platforms:
+  whatsapp:
+    enabled: true
+    dm_policy: disabled
+    group_policy: allowlist
+    group_allow_from: []
+display:
+  tool_progress: 'off'
+  show_reasoning: false
+  interim_assistant_messages: false
+  memory_notifications: 'off'
+  credits_notices: false
+  turn_completion_explainer: false
+  platforms:
+    whatsapp:
+      tool_progress: 'off'
+      show_reasoning: false
+      interim_assistant_messages: false
+      long_running_notifications: false
+      busy_ack_detail: false
+      memory_notifications: 'off'
+compression:
+  threshold: 0.7
+cron:
+  wrap_response: false
+CFG
+  [ -f /opt/copiloto/SOUL.md ] && cp /opt/copiloto/SOUL.md "$DATA/SOUL.md" || true
+  touch "$DATA/.copiloto_configured"
+fi
+
+# Aplica os patches do bridge (idempotente)
+BR=$(find "$DATA/scripts" -name bridge.js 2>/dev/null | head -1)
+[ -n "$BR" ] && /opt/hermes/.venv/bin/python /opt/copiloto/patch-bridge.py "$BR" >/dev/null 2>&1 || true
+
+# Habilita o WhatsApp SO se ja houver sessao pareada (senao o gateway sai com "not paired").
+# O servidor de QR religa (WHATSAPP_ENABLED=true) apos o pareamento.
+if [ -f "$DATA/platforms/whatsapp/session/creds.json" ]; then
+  printf true > /run/s6/container_environment/WHATSAPP_ENABLED 2>/dev/null || true
+else
+  printf false > /run/s6/container_environment/WHATSAPP_ENABLED 2>/dev/null || true
+fi
+
+chown -R "${HERMES_UID:-1000}:${HERMES_GID:-1000}" "$DATA/config.yaml" "$DATA/SOUL.md" "$DATA/whatsapp" 2>/dev/null || true
+exit 0

@@ -1,0 +1,45 @@
+version: "3.8"
+
+# Stack de exemplo — Docker Swarm + Traefik (rede externa "traefik_public").
+# Troque SEU-DOMINIO e as variaveis. Monte /opt/copiloto/data no host.
+services:
+  hermes:
+    image: ghcr.io/windembergn/copiloto-cirurgiao:latest
+    environment:
+      - HERMES_UID=1000
+      - HERMES_GID=1000
+      - TZ=America/Sao_Paulo
+      - OPENAI_API_KEY=sk-COLE-SUA-CHAVE
+      - DASH_USER=admin
+      - DASH_PASS=TroqueEstaSenha2026
+      - WHATSAPP_OWNER_NUMBER=5586999990000
+      - WHATSAPP_OWNER_NAME=Dr. Fulano
+    volumes:
+      - /opt/copiloto/data:/opt/data
+    networks:
+      - traefik_public
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik_public
+        # Pagina de QR em /whatsapp (prioridade maior que o painel)
+        - "traefik.http.routers.cpqr.rule=Host(`SEU-DOMINIO`) && PathPrefix(`/whatsapp`)"
+        - traefik.http.routers.cpqr.entrypoints=websecure
+        - traefik.http.routers.cpqr.tls.certresolver=le
+        - traefik.http.routers.cpqr.service=cpqr
+        - traefik.http.routers.cpqr.priority=1000
+        - traefik.http.services.cpqr.loadbalancer.server.port=8099
+        # Painel do agente (catch-all do dominio)
+        - "traefik.http.routers.cpdash.rule=Host(`SEU-DOMINIO`)"
+        - traefik.http.routers.cpdash.entrypoints=websecure
+        - traefik.http.routers.cpdash.tls.certresolver=le
+        - traefik.http.routers.cpdash.service=cpdash
+        - traefik.http.routers.cpdash.priority=1
+        - traefik.http.services.cpdash.loadbalancer.server.port=9119
+
+networks:
+  traefik_public:
+    external: true
