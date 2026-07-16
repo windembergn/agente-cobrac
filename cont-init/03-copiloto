@@ -41,18 +41,35 @@ display:
   memory_notifications: 'off'
   credits_notices: false
   turn_completion_explainer: false
+  # Audio nao passa pelo debounce, entao cada audio abre um turno e o proximo
+  # interromperia o anterior, gerando "Interrupting current task" em ingles no
+  # grupo. Em steer a mensagem nova entra no turno em andamento, e com o ack
+  # desligado isso acontece em silencio. O modo interrupt (default) nao tem
+  # knob para silenciar esse aviso.
+  busy_input_mode: steer
+  busy_steer_ack_enabled: false
   platforms:
     whatsapp:
       tool_progress: 'off'
       show_reasoning: false
       interim_assistant_messages: false
       long_running_notifications: false
+      busy_steer_ack_enabled: false
       busy_ack_detail: false
       memory_notifications: 'off'
 compression:
   threshold: 0.7
 cron:
   wrap_response: false
+
+# Dicas de primeira vez ("First-time tip — ... /busy queue ...") ja marcadas como
+# vistas: sao one-time, mas a primeira apareceria no grupo do cirurgiao.
+onboarding:
+  seen:
+    busy_input_prompt: true
+    tool_progress_prompt: true
+    openclaw_residue_cleanup: true
+    profile_build_offered: true
 CFG
   [ -f /opt/copiloto/SOUL.md ] && cp /opt/copiloto/SOUL.md "$DATA/SOUL.md" || true
   touch "$DATA/.copiloto_configured"
