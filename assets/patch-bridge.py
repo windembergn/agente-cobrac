@@ -93,7 +93,8 @@ function cpHandleInbound(event, chatId, isGroup, fromOwner) {
 # ---------- A2) troca o enqueue principal pelo handler ----------
 if "Copiloto-enqueue" not in s:
     old = "messageStore.remember(msg);\n      messageQueue.push(event);"
-    new = "messageStore.remember(msg);\n      cpHandleInbound(event, chatId, isGroup, fromOwner); // Copiloto-enqueue"
+    new = ("messageStore.remember(msg);\n"
+           "      cpHandleInbound(event, chatId, isGroup, fromOwner || cpOwnerGroup); // Copiloto-enqueue")
     if old in s:
         s = s.replace(old, new, 1)
         done.append("A2:enqueue")
@@ -116,10 +117,13 @@ if "Copiloto from-me-group" not in s:
         "      // Handle fromMe messages based on mode\n"
         "      let fromOwner = false;\n"
         "      // ===== Copiloto from-me-group =====\n"
+        "      // NAO marcamos fromOwner: o adapter prefixa \'[owner reply] \' no texto\n"
+        "      // quando fromOwner=true, e isso quebra os slash commands, porque\n"
+        "      // MessageEvent.is_command() testa text.startswith(\'/\'). Aqui o dono e\'\n"
+        "      // o usuario principal do grupo, nao uma intervencao num chat de cliente.\n"
         "      // recentlySentIds barra o eco das nossas proprias mensagens (anti-loop).\n"
         "      const cpOwnerGroup = msg.key.fromMe && isGroup && FORWARD_OWNER_MESSAGES\n"
         "        && !recentlySentIds.has(msg.key.id);\n"
-        "      if (cpOwnerGroup) fromOwner = true;\n"
         "      if (msg.key.fromMe && !cpOwnerGroup) {\n"
         "        if (isGroup || chatId.includes('status')) {"
     )
@@ -150,3 +154,9 @@ if "Copiloto no-echo" not in s:
 
 open(F, "w", encoding="utf-8").write(s)
 print("Copiloto patches:", ", ".join(done) if done else "(nada)")
+
+# A2 referencia cpOwnerGroup, que o patch C declara: se um anchor sumir numa
+# versao futura do Hermes, o bridge quebraria so em runtime (node --check nao
+# pega ReferenceError). Falhar aqui mata o build cedo, com a causa na tela.
+if any("FALHOU" in d for d in done):
+    sys.exit(1)
