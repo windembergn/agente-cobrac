@@ -5,6 +5,8 @@ Idempotente: faz backup .bak-copiloto e nao duplica.
 
 A) Debounce 10s + comando /main (ponto unico: onde o evento e' enfileirado).
 B) No-echo: descarta no /send o eco de transcricao de audio (mic) e status do sistema.
+C) From-me em grupo: o bridge base dropa toda mensagem do dono em grupo
+   (fromMe && isGroup), o que impedia o /main e o uso normal no grupo.
 """
 import sys, re
 
@@ -90,6 +92,35 @@ if "Copiloto-enqueue" not in s:
         done.append("A2:enqueue")
     else:
         done.append("A2:FALHOU-anchor-enqueue")
+
+# ---------- C) from-me em grupo ----------
+# O dono digita no proprio celular, entao a mensagem volta como fromMe. O bridge
+# base dropa TODO fromMe em grupo (reason: from_me_group), o que impedia o /main
+# de chegar no handler. Deixamos passar marcando fromOwner=true; recentlySentIds
+# barra o eco das nossas proprias mensagens (anti-loop).
+if "Copiloto from-me-group" not in s:
+    old_c = (
+        "      // Handle fromMe messages based on mode\n"
+        "      let fromOwner = false;\n"
+        "      if (msg.key.fromMe) {\n"
+        "        if (isGroup || chatId.includes('status')) {"
+    )
+    new_c = (
+        "      // Handle fromMe messages based on mode\n"
+        "      let fromOwner = false;\n"
+        "      // ===== Copiloto from-me-group =====\n"
+        "      // recentlySentIds barra o eco das nossas proprias mensagens (anti-loop).\n"
+        "      const cpOwnerGroup = msg.key.fromMe && isGroup && FORWARD_OWNER_MESSAGES\n"
+        "        && !recentlySentIds.has(msg.key.id);\n"
+        "      if (cpOwnerGroup) fromOwner = true;\n"
+        "      if (msg.key.fromMe && !cpOwnerGroup) {\n"
+        "        if (isGroup || chatId.includes('status')) {"
+    )
+    if old_c in s:
+        s = s.replace(old_c, new_c, 1)
+        done.append("C:from-me-group")
+    else:
+        done.append("C:FALHOU-anchor-fromMe")
 
 # ---------- B) no-echo no /send ----------
 if "Copiloto no-echo" not in s:

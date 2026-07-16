@@ -69,6 +69,7 @@ def _onboarding_loop():
                         except Exception:
                             pass
                         _enable_whatsapp()
+                        _fix_perms()
                         _restart_gateway()
                         with _lock:
                             _state["connected"] = True
@@ -82,6 +83,18 @@ def _onboarding_loop():
 
     try:
         asyncio.run(manager())
+    except Exception:
+        pass
+
+
+def _fix_perms():
+    """O qr_server roda como root, entao tudo que o Hermes grava durante o
+    onboarding (.env, gateway_state.json, platforms/whatsapp/session/*) nasce
+    root:root. O gateway roda como uid 1000 e nao consegue ler -> crash-loop
+    com PermissionError em /opt/data/.env. Devolve o volume inteiro pro uid 1000."""
+    try:
+        subprocess.call(["chown", "-R", "1000:1000", "/opt/data"],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         pass
 
@@ -139,10 +152,7 @@ def _set_main_group(jid):
             open(CFG, "w").write(txt)
         except Exception:
             return
-    try:
-        os.system("chown 1000:1000 " + CFG + " 2>/dev/null")
-    except Exception:
-        pass
+    _fix_perms()
     _restart_gateway()
 
 

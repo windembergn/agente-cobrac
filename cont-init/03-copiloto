@@ -70,5 +70,8 @@ else
   printf false > /run/s6/container_environment/WHATSAPP_ENABLED 2>/dev/null || true
 fi
 
-chown -R "${HERMES_UID:-1000}:${HERMES_GID:-1000}" "$DATA/config.yaml" "$DATA/SOUL.md" "$DATA/whatsapp" 2>/dev/null || true
+# chown do volume inteiro: o servidor de QR roda como root, entao o que o
+# Hermes grava durante o onboarding (.env, gateway_state.json, a sessao do
+# WhatsApp) pode nascer root: e o gateway (uid 1000) nao consegue ler.
+chown -R "${HERMES_UID:-1000}:${HERMES_GID:-1000}" "$DATA" 2>/dev/null || true
 exit 0
