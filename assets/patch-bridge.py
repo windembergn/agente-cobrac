@@ -59,10 +59,17 @@ function cpEnqueue(e, id) {
   en.timer = setTimeout(() => cpFlush(id), w);
 }
 function cpActivateMain(chatId) {
-  import('node:fs').then((fs) => {
+  // Manda tambem o nome real do grupo (subject); sem ele o home_channel fica
+  // com o JID cru como nome e o agente exibe isso como nome do proprio canal.
+  Promise.all([
+    import('node:fs'),
+    Promise.resolve().then(() => sock.groupMetadata(chatId)).catch(() => null),
+  ]).then(([fs, md]) => {
     try {
+      const name = (md && md.subject) ? String(md.subject) : '';
       fs.mkdirSync('/opt/data/whatsapp', { recursive: true });
-      fs.writeFileSync('/opt/data/whatsapp/main_group.request', String(chatId));
+      fs.writeFileSync('/opt/data/whatsapp/main_group.request',
+        JSON.stringify({ chat_id: String(chatId), name }));
     } catch (err) {}
   }).catch(() => {});
 }

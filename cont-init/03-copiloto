@@ -60,6 +60,14 @@ fi
 
 # Aplica os patches do bridge (idempotente)
 BR=$(find "$DATA/scripts" -name bridge.js 2>/dev/null | head -1)
+# O patch e' idempotente, entao um bridge ja patchado no volume ficaria preso na
+# versao antiga ao atualizar a imagem. Como o bridge.js da imagem ja vem patchado
+# do build, sincroniza o volume com ele (valida antes de trocar; se o node nao
+# aprovar, mantem o que esta la e deixa o patch abaixo cuidar).
+IMG_BR=/opt/hermes/scripts/whatsapp-bridge/bridge.js
+if [ -n "$BR" ] && [ -f "$IMG_BR" ] && node --check "$IMG_BR" >/dev/null 2>&1; then
+  cp "$IMG_BR" "$BR" 2>/dev/null || true
+fi
 [ -n "$BR" ] && /opt/hermes/.venv/bin/python /opt/copiloto/patch-bridge.py "$BR" >/dev/null 2>&1 || true
 
 # Habilita o WhatsApp SO se ja houver sessao pareada (senao o gateway sai com "not paired").

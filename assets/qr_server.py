@@ -126,10 +126,13 @@ def _qr_png(payload):
 
 
 # ---------------- /main watcher ----------------
-def _set_main_group(jid):
+def _set_main_group(jid, name=""):
     jid = jid.strip()
     if not jid:
         return
+    # home_channel = destino padrao da plataforma. Sem ele o agente nao sabe
+    # qual e' o proprio canal e o cron/send_message ficam sem destino.
+    home = {"platform": "whatsapp", "chat_id": jid, "name": name.strip() or "Grupo do Copiloto"}
     try:
         import yaml
         with open(CFG) as f:
@@ -138,6 +141,7 @@ def _set_main_group(jid):
         cfg["platforms"]["whatsapp"]["group_policy"] = "allowlist"
         cfg["platforms"]["whatsapp"]["dm_policy"] = "disabled"
         cfg["platforms"]["whatsapp"]["group_allow_from"] = [jid]
+        cfg["platforms"]["whatsapp"]["home_channel"] = home
         with open(CFG, "w") as f:
             yaml.safe_dump(cfg, f, allow_unicode=True, sort_keys=False)
     except Exception:
@@ -150,6 +154,7 @@ def _set_main_group(jid):
             else:
                 txt += f"\n{new}\n"
             open(CFG, "w").write(txt)
+            print("[copiloto] /main: yaml indisponivel, home_channel nao gravado", flush=True)
         except Exception:
             return
     _fix_perms()
@@ -160,13 +165,21 @@ def _watch_main():
     while True:
         try:
             if os.path.exists(REQ):
-                jid = open(REQ).read().strip()
+                raw = open(REQ).read().strip()
                 try:
                     os.remove(REQ)
                 except Exception:
                     pass
+                jid, name = raw, ""
+                if raw.startswith("{"):
+                    try:
+                        d = json.loads(raw)
+                        jid = str(d.get("chat_id") or "")
+                        name = str(d.get("name") or "")
+                    except Exception:
+                        jid, name = raw, ""
                 if jid:
-                    _set_main_group(jid)
+                    _set_main_group(jid, name)
         except Exception:
             pass
         time.sleep(3)
