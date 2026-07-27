@@ -87,6 +87,12 @@ if [ -n "$BR" ] && [ -f "$IMG_BR" ] && node --check "$IMG_BR" >/dev/null 2>&1; t
 fi
 [ -n "$BR" ] && /opt/hermes/.venv/bin/python /opt/copiloto/patch-bridge.py "$BR" >/dev/null 2>&1 || true
 
+# MCP do Composio — reconciliado a CADA boot a partir da env COMPOSIO_API_KEY.
+# O cirurgiao so cola a chave na stack: o script cria o MCP server na conta
+# dele, gera a URL com user_id e escreve o bloco mcp_servers no config.yaml.
+# Sem a chave, remove a entrada. Nunca derruba o boot (sai 0 sempre).
+/opt/hermes/.venv/bin/python /opt/copiloto/composio-setup.py || true
+
 # Habilita o WhatsApp SO se ja houver sessao pareada (senao o gateway sai com "not paired").
 # O servidor de QR religa (WHATSAPP_ENABLED=true) apos o pareamento.
 if [ -f "$DATA/platforms/whatsapp/session/creds.json" ]; then
