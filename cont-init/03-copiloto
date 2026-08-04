@@ -81,9 +81,19 @@ BR=$(find "$DATA/scripts" -name bridge.js 2>/dev/null | head -1)
 # versao antiga ao atualizar a imagem. Como o bridge.js da imagem ja vem patchado
 # do build, sincroniza o volume com ele (valida antes de trocar; se o node nao
 # aprovar, mantem o que esta la e deixa o patch abaixo cuidar).
-IMG_BR=/opt/hermes/scripts/whatsapp-bridge/bridge.js
+#
+# Sincroniza a PASTA INTEIRA, nao so o bridge.js: o bridge e' dividido em
+# modulos (bridge_helpers.js, allowlist.js, ...) e copiar so o principal
+# deixa um bridge novo chamando um helper velho — o que quebra o WhatsApp
+# no boot com "does not provide an export named ...". node_modules fica de
+# fora (e' pesado e o proprio Hermes reinstala quando o package.json muda).
+IMG_DIR=/opt/hermes/scripts/whatsapp-bridge
+IMG_BR="$IMG_DIR/bridge.js"
 if [ -n "$BR" ] && [ -f "$IMG_BR" ] && node --check "$IMG_BR" >/dev/null 2>&1; then
-  cp "$IMG_BR" "$BR" 2>/dev/null || true
+  VOL_DIR=$(dirname "$BR")
+  for f in "$IMG_DIR"/*.js "$IMG_DIR"/*.mjs "$IMG_DIR"/*.json; do
+    [ -f "$f" ] && cp "$f" "$VOL_DIR/" 2>/dev/null
+  done
 fi
 [ -n "$BR" ] && /opt/hermes/.venv/bin/python /opt/copiloto/patch-bridge.py "$BR" >/dev/null 2>&1 || true
 
@@ -93,7 +103,18 @@ fi
 # Sem a chave, remove a entrada. Nunca derruba o boot (sai 0 sempre).
 /opt/hermes/.venv/bin/python /opt/copiloto/composio-setup.py || true
 
+# Numeros de WhatsApp (slots) — reconciliado a CADA boot a partir do
+# $DATA/whatsapp/slots.json, que e' a fonte da verdade dos numeros e dos
+# grupos de cada um. Aqui e' onde as plataformas extras (whatsapp2,
+# whatsapp3...) sao geradas dentro da arvore do Hermes: /opt/hermes e'
+# efemero, some quando o container e' recriado, entao precisa ser refeito
+# no boot. Na primeira execucao o slots.json nasce do proprio config.yaml,
+# preservando o numero e o grupo de uma instalacao que ja estava no ar.
+/opt/hermes/.venv/bin/python /opt/copiloto/copiloto_slots.py reconcile || true
+
 # Habilita o WhatsApp SO se ja houver sessao pareada (senao o gateway sai com "not paired").
+# Vale para o numero principal, que e' o unico servido pelo plugin oficial
+# (os slots extras sao ligados individualmente pelo config.yaml).
 # O servidor de QR religa (WHATSAPP_ENABLED=true) apos o pareamento.
 if [ -f "$DATA/platforms/whatsapp/session/creds.json" ]; then
   printf true > /run/s6/container_environment/WHATSAPP_ENABLED 2>/dev/null || true

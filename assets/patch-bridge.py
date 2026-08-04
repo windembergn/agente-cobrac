@@ -3,7 +3,12 @@
 Uso: patch-bridge.py <bridge.js>
 Idempotente: faz backup .bak-copiloto e nao duplica.
 
-A) Debounce 10s + comando /main (ponto unico: onde o evento e' enfileirado).
+A) Debounce 10s + comandos de grupo (ponto unico: onde o evento e' enfileirado):
+   /main   ativa o copiloto neste grupo (SOMA — um numero atende N grupos)
+   /sair   desativa o copiloto neste grupo
+   /grupos lista os grupos ativos DESTE numero
+   Cada bridge atende um numero e se identifica pelo --session, entao os
+   pedidos saem com o caminho da sessao e o watcher sabe de qual numero veio.
 B) No-echo: descarta no /send o eco de transcricao de audio (mic) e status do sistema.
 C) From-me em grupo: o bridge base dropa toda mensagem do dono em grupo
    (fromMe && isGroup), o que impedia o /main e o uso normal no grupo.
@@ -58,7 +63,11 @@ function cpEnqueue(e, id) {
   const w = Math.max(0, Math.min(CP_MS, CP_MAX - (Date.now() - en.firstAt)));
   en.timer = setTimeout(() => cpFlush(id), w);
 }
-function cpActivateMain(chatId) {
+// Este bridge atende UM numero. SESSION_DIR identifica qual — e' assim que
+// o watcher descobre em qual slot (numero) o comando foi dado.
+const CP_REQ_DIR = '/opt/data/whatsapp/requests';
+const CP_SLOTS = '/opt/data/whatsapp/slots.json';
+function cpRequest(action, chatId) {
   // Manda tambem o nome real do grupo (subject); sem ele o home_channel fica
   // com o JID cru como nome e o agente exibe isso como nome do proprio canal.
   Promise.all([
@@ -67,17 +76,60 @@ function cpActivateMain(chatId) {
   ]).then(([fs, md]) => {
     try {
       const name = (md && md.subject) ? String(md.subject) : '';
-      fs.mkdirSync('/opt/data/whatsapp', { recursive: true });
-      fs.writeFileSync('/opt/data/whatsapp/main_group.request',
-        JSON.stringify({ chat_id: String(chatId), name }));
+      fs.mkdirSync(CP_REQ_DIR, { recursive: true });
+      // Um arquivo por pedido: dois numeros podem mandar /main ao mesmo
+      // tempo, e um caminho unico faria um sobrescrever o outro.
+      const uniq = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+      fs.writeFileSync(CP_REQ_DIR + '/' + uniq + '.json', JSON.stringify({
+        action, session: SESSION_DIR, chat_id: String(chatId), name,
+      }));
     } catch (err) {}
   }).catch(() => {});
+}
+function cpMyGroups() {
+  // Le o slots.json e devolve os grupos DESTE numero (casando SESSION_DIR).
+  // readFileSync ja vem do import estatico do topo — o bridge e' ESM, entao
+  // require() nao existe aqui.
+  try {
+    const cfg = JSON.parse(readFileSync(CP_SLOTS, 'utf8'));
+    const norm = (p) => String(p || '').replace(/\/+$/, '');
+    for (const s of (cfg.slots || [])) {
+      const n = String(s.id || '').match(/(\d+)$/);
+      const idx = n ? parseInt(n[1], 10) : 1;
+      let sess;
+      if (s.mode === 'isolated') sess = '/opt/data/profiles/' + s.id + '/platforms/whatsapp/session';
+      else sess = '/opt/data/platforms/' + (idx === 1 ? 'whatsapp' : 'whatsapp' + idx) + '/session';
+      if (norm(sess) === norm(SESSION_DIR)) return s;
+    }
+  } catch (err) {}
+  return null;
+}
+function cpSay(chatId, text) {
+  try { sendWithTimeout(chatId, { text }).catch(() => {}); } catch (err) {}
 }
 function cpHandleInbound(event, chatId, isGroup, fromOwner) {
   const b = (event.body || '').trim();
   if (isGroup && fromOwner && /^\/main\b/i.test(b)) {
-    cpActivateMain(chatId);
-    try { sendWithTimeout(chatId, { text: '✅ Copiloto ativado neste grupo. A partir de agora respondo só aqui. (recarregando, aguarde alguns segundos)' }).catch(() => {}); } catch (err) {}
+    cpRequest('add', chatId);
+    cpSay(chatId, '✅ Copiloto ativado neste grupo. (recarregando, aguarde alguns segundos)');
+    return;
+  }
+  if (isGroup && fromOwner && /^\/sair\b/i.test(b)) {
+    cpRequest('remove', chatId);
+    cpSay(chatId, '👋 Saindo deste grupo. Para reativar, mande /main. (recarregando)');
+    return;
+  }
+  if (isGroup && fromOwner && /^\/grupos\b/i.test(b)) {
+    const slot = cpMyGroups();
+    if (!slot) { cpSay(chatId, 'Não consegui ler a configuração deste número.'); return; }
+    const gs = slot.groups || [];
+    const linhas = gs.map((g) => (g.id === chatId ? '• ' : '• ')
+      + (g.name || g.id) + (g.id === chatId ? '  ← este' : ''));
+    cpSay(chatId, gs.length
+      ? ('*' + (slot.label || 'Este número') + '* está ativo em ' + gs.length
+         + ' grupo(s):\n' + linhas.join('\n')
+         + '\n\nUse /main para ativar num grupo novo e /sair para desativar.')
+      : 'Este número ainda não está ativo em nenhum grupo. Mande /main no grupo desejado.');
     return;
   }
   cpEnqueue(event, chatId);
