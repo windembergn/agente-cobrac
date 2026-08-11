@@ -104,6 +104,21 @@ function cpMyGroups() {
   } catch (err) {}
   return null;
 }
+const CP_TURNO = '/opt/data/whatsapp/turno_atual.json';
+function cpMarkTurno(chatId) {
+  // Marca de qual grupo veio a mensagem que o agente vai atender AGORA. O
+  // script de auto-ajuste le isso e so aceita mudanca vinda do grupo principal;
+  // sem marcador fresco ele recusa (fail-closed). Escrita atomica: dois numeros
+  // podem receber mensagem ao mesmo tempo.
+  import('node:fs').then((fs) => {
+    try {
+      fs.mkdirSync('/opt/data/whatsapp', { recursive: true });
+      const tmp = CP_TURNO + '.' + process.pid + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify({ chat_id: String(chatId), ts: Date.now() }));
+      fs.renameSync(tmp, CP_TURNO);
+    } catch (err) {}
+  }).catch(() => {});
+}
 function cpSay(chatId, text) {
   try { sendWithTimeout(chatId, { text }).catch(() => {}); } catch (err) {}
 }
@@ -132,6 +147,7 @@ function cpHandleInbound(event, chatId, isGroup, fromOwner) {
       : 'Este número ainda não está ativo em nenhum grupo. Mande /main no grupo desejado.');
     return;
   }
+  if (isGroup) cpMarkTurno(chatId);
   cpEnqueue(event, chatId);
 }
 """

@@ -3,13 +3,28 @@
 set -e
 DATA=/opt/data
 CFG="$DATA/config.yaml"
+FAB="$DATA/.fabrica"
 cd "$DATA" 2>/dev/null || true
-mkdir -p "$DATA/whatsapp"
+mkdir -p "$DATA/whatsapp" "$DATA/skills" "$DATA/dados" "$DATA/copiloto-backups" "$FAB"
 
-if [ ! -f "$DATA/.copiloto_configured" ]; then
-  H=$(/opt/hermes/.venv/bin/python -c "from plugins.dashboard_auth.basic import hash_password; print('H4SH='+hash_password('${DASH_PASS:-TroqueASenha2026}'))" 2>/dev/null | sed -n 's/^H4SH=//p' | tail -1)
-  S=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
-  cat > "$CFG" <<CFG
+# ---------------------------------------------------------------------------
+# 1) LINHA DE BASE DE FABRICA — regerada a CADA boot em .fabrica/
+#
+# O agente pode editar o proprio config.yaml, o SOUL e criar skills. Para existir
+# um "restaurar original" que funcione, precisa haver uma copia intocada de como
+# o sistema sai da imagem. Ela e' regerada todo boot (e nao so na instalacao) para
+# que uma imagem nova traga tambem um original novo — senao "restaurar" devolveria
+# o cirurgiao para a versao do dia em que ele instalou, com bugs ja corrigidos.
+#
+# O secret do painel e' REAPROVEITADO se ja existir: regera-lo a cada boot
+# invalidaria a sessao aberta do dashboard a cada atualizacao.
+# ---------------------------------------------------------------------------
+H=$(/opt/hermes/.venv/bin/python -c "from plugins.dashboard_auth.basic import hash_password; print('H4SH='+hash_password('${DASH_PASS:-TroqueASenha2026}'))" 2>/dev/null | sed -n 's/^H4SH=//p' | tail -1)
+S=$(sed -n 's/^ *secret: *"\{0,1\}\([0-9a-f]\{32,\}\)"\{0,1\} *$/\1/p' "$FAB/config.yaml" 2>/dev/null | head -1)
+[ -z "$S" ] && S=$(sed -n 's/^ *secret: *"\{0,1\}\([0-9a-f]\{32,\}\)"\{0,1\} *$/\1/p' "$CFG" 2>/dev/null | head -1)
+[ -z "$S" ] && S=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+
+cat > "$FAB/config.yaml" <<CFG
 model:
   provider: openai-api
   default: gpt-5
@@ -71,8 +86,51 @@ onboarding:
     openclaw_residue_cleanup: true
     profile_build_offered: true
 CFG
-  [ -f /opt/copiloto/SOUL.md ] && cp /opt/copiloto/SOUL.md "$DATA/SOUL.md" || true
+
+# Persona e manual de auto-ajuste tambem entram na linha de base.
+[ -f /opt/copiloto/SOUL.md ] && cp /opt/copiloto/SOUL.md "$FAB/SOUL.md" || true
+[ -f /opt/copiloto/AGENTE.md ] && cp /opt/copiloto/AGENTE.md "$FAB/CLAUDE.md" || true
+
+# ---------------------------------------------------------------------------
+# 2) PRIMEIRO BOOT — instala a linha de base como estado vivo
+# ---------------------------------------------------------------------------
+if [ ! -f "$DATA/.copiloto_configured" ]; then
+  cp "$FAB/config.yaml" "$CFG"
+  [ -f "$FAB/SOUL.md" ] && cp "$FAB/SOUL.md" "$DATA/SOUL.md" || true
+  # Quais skills ja vinham prontas: o "restaurar original" e as copias de
+  # seguranca usam essa lista para mexer SO nas skills que o agente criar
+  # (as nativas sao ~8,5 MB e nao tem por que versionar).
+  ls -1 "$DATA/skills" 2>/dev/null > "$FAB/skills_originais.txt" || true
   touch "$DATA/.copiloto_configured"
+fi
+
+# ---------------------------------------------------------------------------
+# 3) MANUAL DE AUTO-AJUSTE — atualizado a CADA boot
+#
+# /opt/data/CLAUDE.md e' lido pelo agente a cada conversa e ensina como ele muda
+# a si mesmo sem se quebrar. E' documentacao NOSSA, nao personalizacao do
+# cirurgiao: se uma instrucao estiver errada, a correcao tem que chegar pela
+# imagem. Por isso e' sobrescrito (o SOUL, que e' a persona, nao e').
+# ---------------------------------------------------------------------------
+[ -f /opt/copiloto/AGENTE.md ] && cp /opt/copiloto/AGENTE.md "$DATA/CLAUDE.md" || true
+
+# Atalho que o agente usa: /opt/data/copiloto <verbo>
+cat > "$DATA/copiloto" <<'SH'
+#!/bin/sh
+exec /opt/hermes/.venv/bin/python /opt/copiloto/copiloto_self.py "$@"
+SH
+chmod 755 "$DATA/copiloto"
+
+# ---------------------------------------------------------------------------
+# 4) PEDIDO DE RESTAURACAO vindo do painel (botao "Restaurar original")
+#
+# O painel roda como root e nao pode reiniciar o container; entao ele so deixa
+# a bandeira aqui e o restauro acontece no proximo boot, que e' exatamente
+# quando o usuario da Update na stack.
+# ---------------------------------------------------------------------------
+if [ -f "$DATA/.copiloto_restaurar" ]; then
+  /opt/hermes/.venv/bin/python /opt/copiloto/copiloto_self.py fabrica --forcado >/dev/null 2>&1 || true
+  rm -f "$DATA/.copiloto_restaurar"
 fi
 
 # Aplica os patches do bridge (idempotente)
@@ -121,6 +179,12 @@ if [ -f "$DATA/platforms/whatsapp/session/creds.json" ]; then
 else
   printf false > /run/s6/container_environment/WHATSAPP_ENABLED 2>/dev/null || true
 fi
+
+# Foto do config JA ASSENTADO (depois do Composio e dos slots reescreverem o
+# arquivo). E' contra esta foto que o "status" compara para dizer o que o AGENTE
+# mudou — comparar contra .fabrica/config.yaml acusaria como "mudanca do agente"
+# a normalizacao que o proprio sistema faz em todo boot.
+cp "$CFG" "$FAB/config_aplicado.yaml" 2>/dev/null || true
 
 # chown do volume inteiro: o servidor de QR roda como root, entao o que o
 # Hermes grava durante o onboarding (.env, gateway_state.json, a sessao do
