@@ -20,9 +20,15 @@ mkdir -p "$DATA/whatsapp" "$DATA/skills" "$DATA/dados" "$DATA/copiloto-backups" 
 # invalidaria a sessao aberta do dashboard a cada atualizacao.
 # ---------------------------------------------------------------------------
 H=$(/opt/hermes/.venv/bin/python -c "from plugins.dashboard_auth.basic import hash_password; print('H4SH='+hash_password('${DASH_PASS:-TroqueASenha2026}'))" 2>/dev/null | sed -n 's/^H4SH=//p' | tail -1)
-S=$(sed -n 's/^ *secret: *"\{0,1\}\([0-9a-f]\{32,\}\)"\{0,1\} *$/\1/p' "$FAB/config.yaml" 2>/dev/null | head -1)
-[ -z "$S" ] && S=$(sed -n 's/^ *secret: *"\{0,1\}\([0-9a-f]\{32,\}\)"\{0,1\} *$/\1/p' "$CFG" 2>/dev/null | head -1)
-[ -z "$S" ] && S=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+# CUIDADO: nada de "[ -z "$S" ] && S=..." aqui. Com set -e, quando a condicao e'
+# falsa a lista inteira retorna nao-zero e o script MORRE no meio — foi assim que
+# a migracao de persona abaixo deixou de rodar silenciosamente.
+le_secret() {
+  sed -n 's/^ *secret: *"\{0,1\}\([0-9a-f]\{32,\}\)"\{0,1\} *$/\1/p' "$1" 2>/dev/null | head -1
+}
+S=$(le_secret "$FAB/config.yaml")
+if [ -z "$S" ]; then S=$(le_secret "$CFG"); fi
+if [ -z "$S" ]; then S=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'); fi
 
 cat > "$FAB/config.yaml" <<CFG
 model:
@@ -87,9 +93,42 @@ onboarding:
     profile_build_offered: true
 CFG
 
+# --- Persona: decidir a migracao ANTES de sobrescrever a linha de base ---
+#
+# O SOUL do volume nao e' sobrescrito a cada boot de proposito: e' a persona, e o
+# usuario (ou o proprio agente) pode ter editado. Mas isso congelaria uma
+# instalacao antiga na persona do dia em que foi instalada — e uma persona velha
+# que manda "acionar a equipe tecnica" brigaria com o manual novo, que diz que
+# ele se ajusta sozinho. Entao: se a persona viva for IDENTICA a de fabrica
+# (ninguem mexeu), ela pode ser atualizada em seguranca.
+MIGRAR_SOUL=0
+GUARDAR_SOUL=0
+if [ -f /opt/copiloto/SOUL.md ] && [ -f "$DATA/SOUL.md" ]; then
+  if [ -f "$FAB/SOUL.md" ]; then
+    if cmp -s "$DATA/SOUL.md" "$FAB/SOUL.md"; then MIGRAR_SOUL=1; fi
+  else
+    # Instalacao anterior a existencia da linha de base: nao da pra saber se foi
+    # editada. Ate aqui a persona nao era editavel na pratica (o agente recusava
+    # e o tutorial nunca pediu), entao migra — mas guarda a anterior como copia
+    # de seguranca, para o "desfazer" alcancar.
+    MIGRAR_SOUL=1
+    GUARDAR_SOUL=1
+  fi
+fi
+
 # Persona e manual de auto-ajuste tambem entram na linha de base.
 [ -f /opt/copiloto/SOUL.md ] && cp /opt/copiloto/SOUL.md "$FAB/SOUL.md" || true
 [ -f /opt/copiloto/AGENTE.md ] && cp /opt/copiloto/AGENTE.md "$FAB/CLAUDE.md" || true
+
+if [ "$MIGRAR_SOUL" = "1" ]; then
+  if [ "$GUARDAR_SOUL" = "1" ]; then
+    B="$DATA/copiloto-backups/$(date +%Y%m%d-%H%M%S)-persona-anterior"
+    mkdir -p "$B"
+    cp "$DATA/SOUL.md" "$B/SOUL.md" 2>/dev/null || true
+    echo "persona anterior, guardada ao atualizar o sistema" > "$B/motivo.txt"
+  fi
+  cp /opt/copiloto/SOUL.md "$DATA/SOUL.md"
+fi
 
 # ---------------------------------------------------------------------------
 # 2) PRIMEIRO BOOT — instala a linha de base como estado vivo
@@ -97,11 +136,18 @@ CFG
 if [ ! -f "$DATA/.copiloto_configured" ]; then
   cp "$FAB/config.yaml" "$CFG"
   [ -f "$FAB/SOUL.md" ] && cp "$FAB/SOUL.md" "$DATA/SOUL.md" || true
-  # Quais skills ja vinham prontas: o "restaurar original" e as copias de
-  # seguranca usam essa lista para mexer SO nas skills que o agente criar
-  # (as nativas sao ~8,5 MB e nao tem por que versionar).
-  ls -1 "$DATA/skills" 2>/dev/null > "$FAB/skills_originais.txt" || true
   touch "$DATA/.copiloto_configured"
+fi
+
+# Quais skills ja vinham prontas no sistema. O "restaurar original" e as copias
+# de seguranca usam essa lista para mexer SO nas que o agente criar (as nativas
+# sao ~8,5 MB e nao tem por que versionar).
+#
+# FORA do bloco de primeiro boot de proposito: uma instalacao que ja existia nao
+# tem essa lista, e sem ela TODA skill nativa passaria por "criada pelo agente" —
+# o restaurar original apagaria as 14 que vem prontas.
+if [ ! -s "$FAB/skills_originais.txt" ]; then
+  ls -1 "$DATA/skills" 2>/dev/null > "$FAB/skills_originais.txt" || true
 fi
 
 # ---------------------------------------------------------------------------

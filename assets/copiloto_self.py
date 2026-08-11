@@ -132,6 +132,11 @@ def skills_do_agente():
     if not SKILLS.is_dir():
         return []
     nativas = skills_nativas()
+    if not nativas:
+        # Sem a lista de referencia nao da para distinguir o que e' nativo do que
+        # e' do agente. Devolver tudo faria o "restaurar original" apagar as
+        # skills que vem prontas no sistema — entao, na duvida, nao mexe em nada.
+        return []
     return [p for p in sorted(SKILLS.iterdir()) if p.is_dir() and p.name not in nativas]
 
 
