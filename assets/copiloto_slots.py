@@ -128,6 +128,61 @@ def is_paired(slot):
     return os.path.exists(os.path.join(session_path(slot), "creds.json"))
 
 
+def bridge_log(slot):
+    """Log do bridge daquele numero (o adapter o deriva da sessao)."""
+    return os.path.join(os.path.dirname(session_path(slot)), "bridge.log")
+
+
+# Frases do bridge da base (conferidas no bridge.js: "❌ Logged out...",
+# "✅ WhatsApp connected!", "✅ Pairing complete. Credentials saved."). As
+# variantes extras sao rede de seguranca: se a base trocar o texto a
+# deteccao apenas volta ao comportamento antigo (dizer "conectado"), nunca
+# o contrario.
+_LOGOUT_MARKS = ("Logged out", "logged out", "loggedOut", "DisconnectReason.loggedOut")
+_ALIVE_MARKS = ("WhatsApp connected", "Pairing complete", "Bridge ready",
+                "connection opened", "Connected as")
+
+
+def logged_out(slot, tail=20000):
+    """True quando a sessao esta no disco mas o WhatsApp ja a derrubou.
+
+    Desconectar pelo celular (Aparelhos conectados -> sair) NAO apaga o
+    creds.json: o servidor so descobre no proximo handshake, quando o
+    Baileys leva 401 e o bridge registra o logout. Como `is_paired` olha
+    apenas o arquivo, sem isto o painel diria "conectado" para sempre.
+
+    Vence o marcador mais recente: um logout seguido de novo pareamento
+    volta a contar como conectado.
+    """
+    try:
+        path = bridge_log(slot)
+        size = os.path.getsize(path)
+        with open(path, "rb") as f:
+            if size > tail:
+                f.seek(size - tail)
+            txt = f.read().decode("utf-8", "replace")
+    except Exception:
+        return False
+    last_out = max([txt.rfind(m) for m in _LOGOUT_MARKS])
+    if last_out < 0:
+        return False
+    return last_out > max([txt.rfind(m) for m in _ALIVE_MARKS])
+
+
+def unpair(slot):
+    """Apaga a sessao daquele numero. Grupos, memoria e config ficam.
+
+    O log vai junto (guardado como .anterior): senao o "Logged out" antigo
+    continuaria la e `logged_out` marcaria o numero novo como derrubado.
+    """
+    import shutil
+    shutil.rmtree(session_path(slot), ignore_errors=True)
+    try:
+        os.replace(bridge_log(slot), bridge_log(slot) + ".anterior")
+    except Exception:
+        pass
+
+
 def phone_of(slot):
     """Numero conectado, lido da sessao (so para exibir no painel)."""
     try:

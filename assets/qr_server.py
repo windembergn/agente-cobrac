@@ -8,6 +8,7 @@ mesmo container, cada um com sua sessao, seu bridge e seus grupos.
   GET    /whatsapp/api/state             JSON com todos os slots
   POST   /whatsapp/api/slots             cria um slot   {label, mode}
   POST   /whatsapp/api/slots/<id>/pair   (re)inicia o pareamento
+  POST   /whatsapp/api/slots/<id>/logout desconecta o numero, mantendo o slot
   DELETE /whatsapp/api/slots/<id>        remove o slot (desconecta o numero)
   DELETE /whatsapp/api/slots/<id>/groups/<jid>   tira o copiloto de um grupo
   GET    /whatsapp/qr.png?slot=<id>      PNG do QR daquele slot
@@ -224,18 +225,24 @@ class Pairer:
             _log("pos-pareamento do slot %s falhou: %s" % (self.slot_id, e))
 
 
-def _enable_whatsapp_env():
+def _set_whatsapp_env(value):
+    """Liga/desliga a plataforma oficial (a do slot 1) no ambiente do s6."""
     try:
         with open("/run/s6/container_environment/WHATSAPP_ENABLED", "w") as f:
-            f.write("true")
+            f.write(value)
     except Exception:
         pass
     try:
         from hermes_cli.gateway import save_env_value
-        save_env_value("WHATSAPP_ENABLED", "true")
-        save_env_value("WHATSAPP_MODE", os.environ.get("WHATSAPP_MODE", "bot"))
+        save_env_value("WHATSAPP_ENABLED", value)
+        if value == "true":
+            save_env_value("WHATSAPP_MODE", os.environ.get("WHATSAPP_MODE", "bot"))
     except Exception:
         pass
+
+
+def _enable_whatsapp_env():
+    _set_whatsapp_env("true")
 
 
 PAIR_RETRY_SECONDS = 20
@@ -353,15 +360,22 @@ def _state():
     out = []
     for slot in cfg["slots"]:
         paired = S.is_paired(slot)
+        # Sessao no disco nao quer dizer sessao viva: quem desconecta pelo
+        # celular derruba o numero sem apagar nada aqui.
+        stale = paired and S.logged_out(slot)
         with _lock:
             p = _pairers.get(slot["id"])
-        status = "connected" if paired else (p.status if p else "idle")
+        if paired:
+            status = "logged_out" if stale else "connected"
+        else:
+            status = p.status if p else "idle"
         out.append({
             "id": slot["id"],
             "label": slot.get("label") or slot["id"],
             "mode": slot.get("mode") or "shared",
             "port": S.bridge_port(slot),
             "paired": paired,
+            "logged_out": stale,
             "phone": S.phone_of(slot) or (p.phone if p else None),
             "status": status,
             "error": (p.error if p else None),
@@ -400,14 +414,41 @@ def _delete_slot(slot_id):
         p = _pairers.pop(slot_id, None)
     if p:
         p.stop()
-    import shutil
-    shutil.rmtree(S.session_path(slot), ignore_errors=True)
+    S.unpair(slot)
     cfg["slots"] = [s for s in cfg["slots"] if s["id"] != slot_id]
     S.save(cfg)
     S.reconcile(cfg)
     S.fix_perms()
     S.restart_gateway()
     _log("slot %s removido" % slot_id)
+    return None
+
+
+def _logout_slot(slot_id):
+    """Desconecta o numero sem apagar o slot.
+
+    E' o caminho para trocar de aparelho/numero e tambem o conserto de quem
+    desconectou pelo celular: o painel so volta a mostrar o QR depois que a
+    sessao sai do disco. Grupos, memoria e configuracao ficam — quem
+    reconectar o mesmo numero encontra tudo como estava.
+    """
+    cfg = S.load_or_migrate()
+    slot = S.find_slot(cfg, slot_id)
+    if not slot:
+        return "número não encontrado"
+    with _lock:
+        p = _pairers.pop(slot_id, None)
+    if p:
+        p.stop()
+    S.unpair(slot)
+    if S.slot_num(slot) == 1 and slot.get("mode") != "isolated":
+        # A plataforma oficial e' ligada por env; sem sessao ela precisa
+        # voltar a false, senao o adapter sobe so para marcar erro fatal.
+        _set_whatsapp_env("false")
+    S.reconcile(cfg)
+    S.fix_perms()
+    S.restart_gateway(profile=slot["id"] if slot.get("mode") == "isolated" else None)
+    _log("slot %s desconectado pelo painel" % slot_id)
     return None
 
 
@@ -443,6 +484,7 @@ h1{font-size:23px;margin:0 0 4px}
 .qrbox{background:#fff;border-radius:14px;padding:12px;display:inline-block;margin-top:14px}
 .qrbox img{width:210px;height:210px;display:block}
 .hint{color:#94A8BE;font-size:13px;margin-top:10px;line-height:1.5}
+.hint.warn{background:#3A2A16;border:1px solid #7A5A24;color:#E9B872;border-radius:12px;padding:11px 13px}
 .groups{margin-top:14px;border-top:1px solid #23374F;padding-top:12px}
 .glabel{font-size:12px;color:#62768D;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
 .g{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;font-size:14px;border-bottom:1px solid #1B2C43}
@@ -488,11 +530,15 @@ No grupo do WhatsApp: <code>/main</code> ativa o copiloto ali · <code>/sair</co
 let busy=false;
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function slotCard(s){
-  const on=s.paired;
-  const tag=on?'<span class="tag on">conectado</span>':'<span class="tag off">aguardando</span>';
+  const on=s.paired&&!s.logged_out;
+  const tag=on?'<span class="tag on">conectado</span>'
+    :(s.logged_out?'<span class="tag off">desconectado</span>':'<span class="tag off">aguardando</span>');
   const mode='<span class="tag">'+(s.mode==='isolated'?'copiloto separado':'mesmo copiloto')+'</span>';
   let qr='';
-  if(!on){
+  if(s.logged_out){
+    qr='<div class="hint warn">Este número foi desconectado pelo celular (ou pelo próprio WhatsApp). '
+      +'Clique em <b>Desconectar</b> aqui para liberar a vaga — o QR code aparece em seguida para você conectar de novo.</div>';
+  }else if(!on){
     qr='<div class="qrbox"><img src="/whatsapp/qr.png?slot='+s.id+'&t='+Date.now()+'" alt="gerando..."></div>'
       +'<div class="hint"><span class="spin"></span>No WhatsApp deste número: <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b> e aponte para o código.</div>';
   }
@@ -502,9 +548,10 @@ function slotCard(s){
       +(g.id===s.home?'<span class="home">principal</span>':'')+'</span>'
       +'<button class="x" onclick="delGroup(\''+s.id+'\',\''+encodeURIComponent(g.id)+'\')">remover</button></div>').join('');
   }
+  const out=s.paired?'<button class="x" onclick="logoutSlot(\''+s.id+'\',\''+esc(s.label)+'\')">desconectar</button>':'';
   const del=s.id==='wa1'?'':'<button class="x" onclick="delSlot(\''+s.id+'\',\''+esc(s.label)+'\')">remover número</button>';
   return '<div class="card"><div class="head"><span class="name">'+esc(s.label)+'</span>'+tag+mode
-    +'<span style="flex:1"></span>'+del+'</div>'
+    +'<span style="flex:1"></span>'+out+del+'</div>'
     +(s.phone?'<div class="phone">+'+esc(s.phone)+'</div>':'')
     +qr
     +'<div class="groups"><div class="glabel">Grupos ativos ('+s.groups.length+')</div>'+gs+'</div></div>';
@@ -527,6 +574,16 @@ async function addSlot(){
     const r=await fetch('/whatsapp/api/slots',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({label,mode})});
     const j=await r.json();
     if(j.error) alert(j.error); else document.getElementById('lbl').value='';
+  }catch(e){alert('falhou');}
+  busy=false;
+}
+async function logoutSlot(id,label){
+  if(!confirm('Desconectar "'+label+'"?\n\nO número sai do copiloto e esta página volta a mostrar o QR code, para você conectar o mesmo número de novo ou trocar por outro.\n\nSeus grupos e as conversas continuam guardados.')) return;
+  busy=true;
+  try{
+    const r=await fetch('/whatsapp/api/slots/'+id+'/logout',{method:'POST'});
+    const j=await r.json();
+    if(j.error) alert(j.error);
   }catch(e){alert('falhou');}
   busy=false;
 }
@@ -607,7 +664,7 @@ class H(BaseHTTPRequestHandler):
         if path == "/whatsapp/state":  # compat com o tutorial antigo
             st = _state()["slots"]
             s0 = st[0] if st else {}
-            return self._json({"connected": bool(s0.get("paired")),
+            return self._json({"connected": bool(s0.get("paired") and not s0.get("logged_out")),
                                "status": s0.get("status") or "starting"})
 
         if path == "/whatsapp/qr.png":
@@ -649,6 +706,9 @@ class H(BaseHTTPRequestHandler):
                 return self._json({"error": "número não encontrado"}, 404)
             _pairer_for(slot, restart=True)
             return self._json({"ok": True})
+        if len(parts) == 5 and parts[:3] == ["whatsapp", "api", "slots"] and parts[4] == "logout":
+            err = _logout_slot(parts[3])
+            return self._json({"error": err} if err else {"ok": True})
         self.send_response(404); self.end_headers()
 
     # ---------------------------------------------------------- DELETE
