@@ -520,6 +520,13 @@ def _reconcile_profile(slot):
 
 
 def _register_profile_service(name):
+    """Poe o gateway do perfil no ar, agora.
+
+    Duas etapas separadas de proposito: registrar cria o servico s6, mas ele
+    nasce "down" — o start=True nem sempre acontece, e quando o registro em
+    runtime nao e' suportado a funcao saia calada, sem servico e sem pista no
+    log. O restart_gateway no fim sobe o servico exista ele de antes ou nao.
+    """
     try:
         sys.path.insert(0, "/opt/hermes")
         from hermes_cli.service_manager import detect_service_manager
@@ -527,9 +534,14 @@ def _register_profile_service(name):
         if getattr(sm, "supports_runtime_registration", lambda: False)():
             sm.register_profile_gateway(name, start=True)
             _log("gateway do perfil %s registrado" % name)
-            return
+        else:
+            _log("service manager sem registro em runtime — subindo %s direto" % name)
     except Exception as e:
-        _log("registro runtime do perfil %s falhou (%s) — sobe no proximo boot" % (name, e))
+        _log("registro runtime do perfil %s falhou (%s)" % (name, e))
+    if restart_gateway(profile=name):
+        _log("gateway do perfil %s no ar" % name)
+    else:
+        _log("gateway do perfil %s nao subiu — sobe no proximo boot" % name)
 
 
 def _prune_profiles(cfg):
@@ -617,9 +629,16 @@ def reconcile(cfg=None):
 
 
 def restart_gateway(profile=None):
+    """Reinicia o gateway — e sobe o que ainda nao rodou.
+
+    O `-u` nao e' enfeite: `s6-svc -r` sozinho so reinicia servico que ja
+    esta de pe. Num "down (not started yet)" — exatamente o gateway de um
+    perfil recem-criado — ele devolve exit 0 e nao faz nada, entao o
+    copiloto separado ficava pareado, mudo e sem erro nenhum no log.
+    """
     svc = "gateway-%s" % (profile or "default")
-    for cmd in ("/command/s6-svc -r /run/service/%s" % svc,
-                "s6-svc -r /run/service/%s" % svc):
+    for cmd in ("/command/s6-svc -ru /run/service/%s" % svc,
+                "s6-svc -ru /run/service/%s" % svc):
         try:
             if subprocess.call(cmd.split(), stdout=subprocess.DEVNULL,
                                stderr=subprocess.DEVNULL) == 0:
