@@ -104,8 +104,23 @@ function cpMyGroups() {
   } catch (err) {}
   return null;
 }
+let cpCacheGrupos = { quando: 0, ids: [] };
+function cpGrupoAtivado(chatId) {
+  // O grupo ja passou pelo /main? Le do slots.json, com cache de 5s porque isto
+  // roda a CADA mensagem recebida — inclusive as dos grupos que nao sao nossos.
+  const agora = Date.now();
+  if (agora - cpCacheGrupos.quando > 5000) {
+    let ids = [];
+    try {
+      const slot = cpMyGroups();
+      ids = ((slot && slot.groups) || []).map((g) => String(g.id || ''));
+    } catch (err) {}
+    cpCacheGrupos = { quando: agora, ids };
+  }
+  return cpCacheGrupos.ids.indexOf(String(chatId)) !== -1;
+}
 const CP_TURNO = '/opt/data/whatsapp/turno_atual.json';
-function cpMarkTurno(chatId) {
+function cpMarkTurno(chatId, quem) {
   // Marca de qual grupo veio a mensagem que o agente vai atender AGORA. O
   // script de auto-ajuste le isso e so aceita mudanca vinda do grupo principal;
   // sem marcador fresco ele recusa (fail-closed). Escrita atomica: dois numeros
@@ -114,7 +129,9 @@ function cpMarkTurno(chatId) {
     try {
       fs.mkdirSync('/opt/data/whatsapp', { recursive: true });
       const tmp = CP_TURNO + '.' + process.pid + '.tmp';
-      fs.writeFileSync(tmp, JSON.stringify({ chat_id: String(chatId), ts: Date.now() }));
+      fs.writeFileSync(tmp, JSON.stringify({
+        chat_id: String(chatId), sender: String(quem || ''), ts: Date.now(),
+      }));
       fs.renameSync(tmp, CP_TURNO);
     } catch (err) {}
   }).catch(() => {});
@@ -122,7 +139,7 @@ function cpMarkTurno(chatId) {
 function cpSay(chatId, text) {
   try { sendWithTimeout(chatId, { text }).catch(() => {}); } catch (err) {}
 }
-function cpHandleInbound(event, chatId, isGroup, fromOwner) {
+function cpHandleInbound(event, chatId, isGroup, fromOwner, quem) {
   const b = (event.body || '').trim();
   if (isGroup && fromOwner && /^\/main\b/i.test(b)) {
     cpRequest('add', chatId);
@@ -147,7 +164,7 @@ function cpHandleInbound(event, chatId, isGroup, fromOwner) {
       : 'Este número ainda não está ativo em nenhum grupo. Mande /main no grupo desejado.');
     return;
   }
-  if (isGroup) cpMarkTurno(chatId);
+  if (isGroup) cpMarkTurno(chatId, fromOwner ? 'dono' : quem);
   cpEnqueue(event, chatId);
 }
 """
@@ -162,12 +179,32 @@ function cpHandleInbound(event, chatId, isGroup, fromOwner) {
 if "Copiloto-enqueue" not in s:
     old = "messageStore.remember(msg);\n      messageQueue.push(event);"
     new = ("messageStore.remember(msg);\n"
-           "      cpHandleInbound(event, chatId, isGroup, fromOwner || cpOwnerGroup); // Copiloto-enqueue")
+           "      cpHandleInbound(event, chatId, isGroup, fromOwner || cpOwnerGroup, senderId); // Copiloto-enqueue")
     if old in s:
         s = s.replace(old, new, 1)
         done.append("A2:enqueue")
     else:
         done.append("A2:FALHOU-anchor-enqueue")
+
+# ---------- E) todo mundo fala dentro do grupo ativado ----------
+# O bridge base checa TODA mensagem que nao e' do dono contra
+# WHATSAPP_ALLOWED_USERS. Essa lista existe para barrar estranho no PRIVADO —
+# mas, sem ela preenchida, tambem cala os participantes do grupo: o copiloto
+# ficava respondendo so ao dono, e a secretaria ou o socio falavam no vazio
+# (log: reason "allowlist_mismatch" com o chatId do proprio grupo ativado).
+# Aqui o grupo E' o canal: quem esta num grupo que passou pelo /main fala com
+# ele. Privado e grupo nao ativado seguem barrados exatamente como antes.
+if "Copiloto-grupo-aberto" not in s:
+    old_e = ("        if (WHATSAPP_DM_POLICY !== 'pairing' "
+             "&& !matchesAllowedUser(senderId, ALLOWED_USERS, SESSION_DIR)) {")
+    new_e = ("        const cpGrupoAberto = isGroup && cpGrupoAtivado(chatId); // Copiloto-grupo-aberto\n"
+             "        if (!cpGrupoAberto && WHATSAPP_DM_POLICY !== 'pairing' "
+             "&& !matchesAllowedUser(senderId, ALLOWED_USERS, SESSION_DIR)) {")
+    if old_e in s:
+        s = s.replace(old_e, new_e, 1)
+        done.append("E:grupo-aberto")
+    else:
+        done.append("E:FALHOU-anchor-allowlist")
 
 # ---------- C) from-me em grupo ----------
 # O dono digita no proprio celular, entao a mensagem volta como fromMe. O bridge

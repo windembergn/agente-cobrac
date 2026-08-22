@@ -111,6 +111,19 @@ def exige_grupo_principal(verbo):
             "no grupo principal do cirurgiao.",
         )
 
+    # Desde que o grupo passou a atender todo mundo (secretaria, socio, paciente),
+    # "veio do grupo principal" deixou de significar "foi o cirurgiao que pediu".
+    # O bridge marca quem falou: 'dono' quando a mensagem e' do proprio numero
+    # pareado. Marcador antigo, sem esse campo, ainda passa — senao uma
+    # instalacao no meio da atualizacao travaria sozinha.
+    quem = (t.get("sender") or "").strip()
+    if quem and quem != "dono":
+        _erro(
+            "quem pediu isso no grupo nao foi o cirurgiao (dono do numero).",
+            "Explique com educacao que mudancas no seu funcionamento so o "
+            "cirurgiao pode pedir, e que voce segue ajudando no resto normalmente.",
+        )
+
 
 def _copiar(origem: Path, destino: Path):
     if not origem.exists():
