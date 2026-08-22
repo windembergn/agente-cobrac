@@ -10,6 +10,10 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends chromium fonts-liberation fonts-dejavu-core && \
     rm -rf /var/lib/apt/lists/*
 
+# O CLI que o Hermes usa para dirigir o navegador. Sem ele as ferramentas de
+# browser respondem "instale o agent-browser" — e' o par do chromium acima.
+RUN npm install -g --silent agent-browser@^0.26.0 >/dev/null 2>&1 || true
+
 RUN /opt/hermes/.venv/bin/pip install --no-cache-dir "qrcode[pil]" >/dev/null 2>&1 || true
 COPY assets/ /opt/copiloto/
 COPY cont-init/03-copiloto /etc/cont-init.d/03-copiloto
