@@ -133,8 +133,13 @@ O resumo:
 3. `/opt/data/copiloto site conferir <nome>` — só mande o link depois que passar
 4. `/opt/data/copiloto site listar` diz a URL exata
 
-**Você não escreve CSS.** A aparência inteira vem de `/s/_kit/base.css`, que os modelos já
-carregam. Página com CSS improvisado sai feia — foi para isso que o kit existe.
+**Você não escreve CSS nem JavaScript.** A aparência vem de `/s/_kit/base.css` e o
+comportamento (animação de seção, carrossel, contador, FAQ) de `/s/_kit/kit.js` — os modelos já
+carregam os dois. Preencha o texto e **preserve as classes do modelo**; página com marcação
+reescrita "do seu jeito" sai diferente e pior a cada vez.
+
+O padrão, quando o cirurgião não pedir nada: **branco e azul, limpo, com animação de entrada em
+cada seção e botão de WhatsApp pulsando**. Está detalhado na habilidade.
 
 Fotos que o cirurgião mandou no WhatsApp ficam em `/opt/data/image_cache/`: copie a que ele
 mandou para dentro da pasta do site e referencie pelo nome do arquivo.

@@ -58,7 +58,10 @@ mkdir -p /opt/data/sites/<nome>
 cp /opt/data/sites/_kit/modelos/landing.html /opt/data/sites/<nome>/index.html
 ```
 
-**3. Preencha.** Troque **todo** `[[MARCADOR]]` por conteúdo real. Depois rode
+**3. Preencha — mexendo só no texto.** Troque **todo** `[[MARCADOR]]` por conteúdo real,
+mantendo as classes que já estão no HTML (`revelar`, `cartao centro`, `icone-svg`, `btn-pulso`,
+`barra-fixa`…). Elas são o acabamento: reescrever a marcação "do seu jeito" é o que faz a página
+sair diferente e pior a cada vez. Depois rode
 `grep -o "\[\[[A-Z_]*\]\]" /opt/data/sites/<nome>/index.html` — se sobrou marcador, a página está
 quebrada. Seção que não faz sentido para o caso: **apague a seção inteira**, não deixe vazia.
 
@@ -96,9 +99,11 @@ Só mude se ele pedir.
 
 O que já vem pronto e você só precisa **não estragar**:
 
-- **Animação de entrada por seção.** Ponha `class="revelar"` no bloco de cada seção (e
-  `revelar-d1`, `revelar-d2`, `revelar-d3` nos cartões seguintes, para entrarem em cascata). Quem
-  configurou o celular para menos movimento não vê animação nenhuma — isso é automático.
+- **Animação de entrada por seção — em TODA seção, sem exceção.** As classes já vêm no modelo:
+  `class="revelar"` no bloco de cada seção e `revelar-d1`/`d2`/`d3` nos cartões seguintes, para
+  entrarem em cascata. Ao preencher, **não apague essas classes** — e se você criar uma seção nova,
+  ponha nela também. A conferência recusa a página que não tiver nenhuma. Quem configurou o celular
+  para menos movimento não vê animação — isso é automático, você não precisa fazer nada.
 - **Botão que pulsa:** `class="btn btn-zap btn-grande btn-pulso"` no botão principal de WhatsApp.
   Verde de WhatsApp no CTA, azul no resto.
 - **Barra fixa embaixo no celular** (`.barra-fixa`) e bolha no desktop (`.zap-flutuante`): já vêm

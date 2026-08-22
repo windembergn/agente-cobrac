@@ -402,6 +402,12 @@ def cmd_site_conferir(nome):
                 if not (SITES / "_kit" / a[len("/s/_kit/"):]).exists():
                     problemas.append("%s: o kit de design nao esta onde a pagina procura (%s)" % (rel, a))
                 continue
+            if a.startswith("/s/"):
+                # link para outra pagina publicada: valido, mas o alvo tem que existir
+                destino = a[len("/s/"):].split("?")[0].split("#")[0].rstrip("/")
+                if destino and not (SITES / destino).exists() and not (SITES / (destino + "/index.html")).exists():
+                    problemas.append("%s: aponta para /s/%s/, que nao existe" % (rel, destino))
+                continue
             if a.startswith("/"):
                 avisos.append("%s: caminho absoluto '%s' so funciona se existir na raiz do dominio; "
                               "use caminho relativo" % (rel, a))
@@ -424,6 +430,13 @@ def cmd_site_conferir(nome):
         if aberto != fechado:
             problemas.append("%s: HTML desbalanceado (%d <section> x %d </section>)"
                              % (rel, aberto, fechado))
+
+        if 'class="documento"' not in html and "/s/_kit/kit.js" in html:
+            if 'revelar' not in html:
+                problemas.append(
+                    "%s: nenhuma secao com animacao de entrada. Ponha class=\"revelar\" no bloco "
+                    "de cada secao (e revelar-d1/d2/d3 nos cartoes seguintes, para entrarem em "
+                    "cascata) — o modelo ja vem com elas, nao apague." % rel)
 
         if 'class="documento"' not in html:
             n = _palavras(html)
