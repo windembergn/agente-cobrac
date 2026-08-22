@@ -1,4 +1,10 @@
 <!doctype html>
+<!--
+  MODELO DE LANDING — este esqueleto e' o PISO, nao o teto.
+  Cada [[MARCADOR]] de paragrafo espera 3 a 6 linhas com motivo, prazo e exemplo,
+  nao uma frase. Duplique blocos e crie secoes novas quando o assunto pedir.
+  Alvo: 900 a 1500 palavras de texto visivel.
+-->
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
@@ -21,6 +27,7 @@
   <div class="container">
     <a class="marca" href="#">[[NOME_CURTO]]<span>.</span></a>
     <nav>
+      <a href="#tratamento">O tratamento</a>
       <a href="#como">Como funciona</a>
       <a href="#sobre">Quem cuida de você</a>
       <a href="#duvidas">Dúvidas</a>
@@ -36,12 +43,12 @@
       <div>
         <span class="selo">[[SELO_CURTO]]</span>
         <h1>[[TITULO_PRINCIPAL_ATE_10_PALAVRAS]]</h1>
-        <p class="lede">[[SUBTITULO_QUE_EXPLICA_O_BENEFICIO_EM_UMA_FRASE]]</p>
+        <p class="lede">[[SUBTITULO_2_A_3_LINHAS_DIZENDO_O_QUE_O_PACIENTE_GANHA]]</p>
         <div class="linha">
           <a class="btn btn-grande" href="[[LINK_WHATSAPP]]">[[TEXTO_DO_BOTAO]]</a>
           <a class="btn btn-vazado btn-grande" href="#como">Entender o processo</a>
         </div>
-        <p class="small muted" style="margin-top:var(--sp-4)">[[LINHA_DE_CONFIANCA_EX_CRO_E_ANOS_DE_EXPERIENCIA]]</p>
+        <p class="small muted" style="margin-top:var(--sp-4)">[[LINHA_DE_CONFIANCA_CRO_E_EXPERIENCIA]]</p>
       </div>
       <img class="hero-figura" src="[[IMAGEM_PRINCIPAL]]" alt="[[DESCRICAO_DA_IMAGEM]]">
     </div>
@@ -56,53 +63,120 @@
     </div>
   </section>
 
+  <!-- O PROBLEMA — fale da vida do paciente, nao do procedimento -->
   <section>
     <div class="container pilha-larga">
       <div class="centro">
-        <p class="rotulo">O que resolvemos</p>
+        <p class="rotulo">[[ROTULO_DA_SECAO]]</p>
         <h2>[[TITULO_DA_SECAO_DE_PROBLEMAS]]</h2>
+        <p class="lede">[[PARAGRAFO_DE_ABERTURA_3_A_5_LINHAS]]</p>
       </div>
       <div class="grade grade-3">
         <article class="cartao">
           <div class="icone">[[EMOJI_1]]</div>
           <h3>[[PROBLEMA_1]]</h3>
-          <p>[[EXPLICACAO_CURTA_1]]</p>
+          <p>[[EXPLICACAO_3_A_5_LINHAS_1]]</p>
         </article>
         <article class="cartao">
           <div class="icone">[[EMOJI_2]]</div>
           <h3>[[PROBLEMA_2]]</h3>
-          <p>[[EXPLICACAO_CURTA_2]]</p>
+          <p>[[EXPLICACAO_3_A_5_LINHAS_2]]</p>
         </article>
         <article class="cartao">
           <div class="icone">[[EMOJI_3]]</div>
           <h3>[[PROBLEMA_3]]</h3>
-          <p>[[EXPLICACAO_CURTA_3]]</p>
+          <p>[[EXPLICACAO_3_A_5_LINHAS_3]]</p>
         </article>
       </div>
     </div>
   </section>
 
-  <section id="como" class="faixa">
+  <!-- O TRATAMENTO EXPLICADO — o que e', quando e' indicado, como e' feito -->
+  <section id="tratamento" class="faixa">
+    <div class="container duas-colunas">
+      <div class="pilha">
+        <p class="rotulo">O tratamento</p>
+        <h2>[[TITULO_EXPLICANDO_O_TRATAMENTO]]</h2>
+        <p>[[O_QUE_E_4_A_6_LINHAS]]</p>
+        <p>[[QUANDO_E_INDICADO_E_QUANDO_NAO_E_4_A_6_LINHAS]]</p>
+      </div>
+      <div class="cartao">
+        <h3>Indicado para quem</h3>
+        <ul class="checklist">
+          <li>[[INDICACAO_1]]</li>
+          <li>[[INDICACAO_2]]</li>
+          <li>[[INDICACAO_3]]</li>
+          <li>[[INDICACAO_4]]</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMO FUNCIONA — cada passo com o que acontece e quanto tempo leva -->
+  <section id="como">
     <div class="container pilha-larga">
       <div class="centro">
         <p class="rotulo">Como funciona</p>
         <h2>[[TITULO_DO_PASSO_A_PASSO]]</h2>
+        <p class="lede">[[FRASE_DE_ABERTURA_DO_PROCESSO]]</p>
       </div>
       <ol class="passos estreito">
-        <li><div><h3>[[PASSO_1]]</h3><p>[[DETALHE_1]]</p></div></li>
-        <li><div><h3>[[PASSO_2]]</h3><p>[[DETALHE_2]]</p></div></li>
-        <li><div><h3>[[PASSO_3]]</h3><p>[[DETALHE_3]]</p></div></li>
+        <li><div><h3>[[PASSO_1]]</h3><p>[[DETALHE_3_A_5_LINHAS_1]]</p></div></li>
+        <li><div><h3>[[PASSO_2]]</h3><p>[[DETALHE_3_A_5_LINHAS_2]]</p></div></li>
+        <li><div><h3>[[PASSO_3]]</h3><p>[[DETALHE_3_A_5_LINHAS_3]]</p></div></li>
+        <li><div><h3>[[PASSO_4]]</h3><p>[[DETALHE_3_A_5_LINHAS_4]]</p></div></li>
       </ol>
     </div>
   </section>
 
-  <section id="sobre">
+  <!-- RECUPERACAO / O QUE ESPERAR — some a secao se nao fizer sentido -->
+  <section class="faixa">
+    <div class="container pilha-larga">
+      <div class="centro">
+        <p class="rotulo">Depois do procedimento</p>
+        <h2>[[TITULO_DA_RECUPERACAO]]</h2>
+      </div>
+      <div class="tabela-rolavel">
+        <table>
+          <thead><tr><th>Quando</th><th>O que é esperado</th><th>O que você já pode fazer</th></tr></thead>
+          <tbody>
+            <tr><td>[[PERIODO_1]]</td><td>[[ESPERADO_1]]</td><td>[[PODE_1]]</td></tr>
+            <tr><td>[[PERIODO_2]]</td><td>[[ESPERADO_2]]</td><td>[[PODE_2]]</td></tr>
+            <tr><td>[[PERIODO_3]]</td><td>[[ESPERADO_3]]</td><td>[[PODE_3]]</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="aviso estreito">
+        <p><strong>Quando ligar para o consultório:</strong> [[SINAIS_DE_ALERTA]].</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- O QUE ESTA INCLUSO -->
+  <section>
+    <div class="container duas-colunas">
+      <div class="pilha">
+        <p class="rotulo">O que está incluso</p>
+        <h2>[[TITULO_DO_QUE_ESTA_INCLUSO]]</h2>
+        <p>[[PARAGRAFO_EXPLICANDO_O_ACOMPANHAMENTO]]</p>
+      </div>
+      <ul class="checklist">
+        <li>[[INCLUSO_1]]</li>
+        <li>[[INCLUSO_2]]</li>
+        <li>[[INCLUSO_3]]</li>
+        <li>[[INCLUSO_4]]</li>
+        <li>[[INCLUSO_5]]</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="sobre" class="faixa">
     <div class="container duas-colunas">
       <img class="retrato" src="[[FOTO_DO_CIRURGIAO]]" alt="[[NOME_COMPLETO]]">
       <div class="pilha">
         <p class="rotulo">Quem cuida de você</p>
         <h2>[[NOME_COMPLETO]]</h2>
-        <p>[[PARAGRAFO_DE_APRESENTACAO_EM_PRIMEIRA_PESSOA_OU_TERCEIRA]]</p>
+        <p>[[APRESENTACAO_4_A_6_LINHAS]]</p>
         <ul class="checklist">
           <li>[[CREDENCIAL_1]]</li>
           <li>[[CREDENCIAL_2]]</li>
@@ -112,7 +186,8 @@
     </div>
   </section>
 
-  <section class="faixa">
+  <!-- DEPOIMENTOS — APAGUE a secao inteira se o cirurgiao nao passou nenhum -->
+  <section>
     <div class="container pilha-larga">
       <div class="centro"><h2>[[TITULO_DOS_DEPOIMENTOS]]</h2></div>
       <div class="grade grade-2">
@@ -122,13 +197,18 @@
     </div>
   </section>
 
-  <section id="duvidas">
+  <!-- DUVIDAS — 6 a 12 perguntas, resposta de 3 a 6 linhas cada -->
+  <section id="duvidas" class="faixa">
     <div class="container estreito pilha">
       <div class="centro"><h2>Perguntas frequentes</h2></div>
-      <details class="faq"><summary>[[PERGUNTA_1]]</summary><p>[[RESPOSTA_1]]</p></details>
-      <details class="faq"><summary>[[PERGUNTA_2]]</summary><p>[[RESPOSTA_2]]</p></details>
-      <details class="faq"><summary>[[PERGUNTA_3]]</summary><p>[[RESPOSTA_3]]</p></details>
-      <details class="faq"><summary>[[PERGUNTA_4]]</summary><p>[[RESPOSTA_4]]</p></details>
+      <details class="faq"><summary>[[PERGUNTA_1]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_1]]</p></details>
+      <details class="faq"><summary>[[PERGUNTA_2]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_2]]</p></details>
+      <details class="faq"><summary>[[PERGUNTA_3]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_3]]</p></details>
+      <details class="faq"><summary>[[PERGUNTA_4]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_4]]</p></details>
+      <details class="faq"><summary>[[PERGUNTA_5]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_5]]</p></details>
+      <details class="faq"><summary>[[PERGUNTA_6]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_6]]</p></details>
+      <details class="faq"><summary>[[PERGUNTA_7]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_7]]</p></details>
+      <details class="faq"><summary>[[PERGUNTA_8]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_8]]</p></details>
     </div>
   </section>
 
@@ -138,6 +218,7 @@
         <h2>[[CHAMADA_FINAL]]</h2>
         <p>[[FRASE_DE_APOIO_DA_CHAMADA]]</p>
         <a class="btn btn-claro btn-grande" href="[[LINK_WHATSAPP]]">[[TEXTO_DO_BOTAO]]</a>
+        <p class="small">[[LINHA_DE_ATENDIMENTO_HORARIO_OU_LOCAL]]</p>
       </div>
     </div>
   </section>

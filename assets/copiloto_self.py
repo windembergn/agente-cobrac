@@ -15,6 +15,9 @@ Verbos:
 
   servidor           mostra se o acesso ao servidor (SSH) esta funcionando
 
+  cerebro                 qual cerebro esta em uso agora
+  cerebro claude|gpt      troca o cerebro (claude|opus|sonnet|gpt|auto) e reinicia
+
 Trava de grupo: os verbos que MUDAM alguma coisa so rodam se a mensagem que esta
 sendo atendida veio do grupo principal (o primeiro ativado, campo "home" do slot 1).
 O bridge grava a origem do turno em whatsapp/turno_atual.json; sem marcador fresco
@@ -38,7 +41,7 @@ TURNO = DATA / "whatsapp" / "turno_atual.json"
 SKILLS = DATA / "skills"
 
 # Arquivos versionados a cada "ajuste". Caminhos relativos a DATA.
-ITENS = ["config.yaml", "SOUL.md", "CLAUDE.md"]
+ITENS = ["config.yaml", "SOUL.md", "CLAUDE.md", "cerebro.json"]
 
 # As skills sao tratadas a parte: /opt/data/skills tem ~8,5 MB de skills nativas
 # que vem prontas no sistema. Copiar tudo a cada ajuste encheria o disco por nada,
@@ -349,6 +352,20 @@ _MARCADOR = re.compile(r"\[\[[A-Z0-9_]+\]\]")
 # src="..." / href="..." apontando para arquivo local (nao http, nao #, nao data:)
 _LOCAL = re.compile(r'(?:src|href)\s*=\s*"([^"]+)"', re.I)
 
+# Densidade minima. Pagina bonita e vazia continua sendo pagina ruim: o paciente
+# le em 15 segundos, nao tira duvida nenhuma e liga no consultorio do mesmo
+# jeito. Documento (relatorio, laudo) e' isento — ali completo vale mais que
+# longo, e enche-linguica seria um defeito.
+PALAVRAS_MINIMO = 300
+PALAVRAS_BOM = 600
+_SEM_TAG = re.compile(r"<(script|style|head)\b.*?</\1>|<[^>]+>", re.I | re.S)
+
+
+def _palavras(html):
+    texto = _SEM_TAG.sub(" ", html)
+    texto = re.sub(r"&[a-z#0-9]+;", " ", texto)
+    return len([p for p in texto.split() if len(p) > 1])
+
 
 def cmd_site_conferir(nome):
     if not nome:
@@ -405,6 +422,19 @@ def cmd_site_conferir(nome):
             problemas.append("%s: HTML desbalanceado (%d <section> x %d </section>)"
                              % (rel, aberto, fechado))
 
+        if 'class="documento"' not in html:
+            n = _palavras(html)
+            if n < PALAVRAS_MINIMO:
+                problemas.append(
+                    "%s: pagina rasa — so %d palavras. Nao serve pro paciente: ele le em 15 "
+                    "segundos e continua com as mesmas duvidas. Desenvolva cada secao (motivo, "
+                    "prazo, exemplo), acrescente secoes e leve o FAQ para 6-12 perguntas com "
+                    "resposta de verdade." % (rel, n))
+            elif n < PALAVRAS_BOM:
+                avisos.append(
+                    "%s: %d palavras — da' pra aprofundar. O alvo e' 900-1500 numa landing e "
+                    "800-1400 num material de paciente." % (rel, n))
+
     saida = []
     if avisos:
         saida.append("AVISOS (nao impedem publicar):")
@@ -449,6 +479,104 @@ def cmd_site(argumentos):
     else:
         _erro("verbo de site desconhecido: %s" % sub,
               "Use: site listar | site conferir <nome> | site remover <nome>")
+
+
+# ------------------------------------------------------------------ cerebro
+CEREBRO = DATA / "cerebro.json"
+CFG_YAML = DATA / "config.yaml"
+
+
+def _cerebro_atual():
+    """(provider, modelo) lidos do config.yaml vivo, sem depender de yaml."""
+    try:
+        texto = CFG_YAML.read_text(encoding="utf-8")
+    except OSError:
+        return ("", "")
+    bloco = re.search(r"^model:\s*$(.*?)^\S", texto, re.M | re.S)
+    trecho = bloco.group(1) if bloco else texto[:400]
+    prov = re.search(r"^\s+provider:\s*(\S+)", trecho, re.M)
+    mod = re.search(r"^\s+default:\s*(\S+)", trecho, re.M)
+    return (prov.group(1) if prov else "", mod.group(1) if mod else "")
+
+
+def _tem_chave_claude():
+    return any(
+        (os.environ.get(v) or "").strip() and "COLE" not in (os.environ.get(v) or "").upper()
+        for v in ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_TOKEN")
+    )
+
+
+def _nome_humano(provider, modelo):
+    if provider == "anthropic":
+        familia = "Opus" if "opus" in modelo else ("Sonnet" if "sonnet" in modelo else modelo)
+        return "Claude %s" % familia
+    if provider == "openai-api":
+        return "GPT (%s)" % modelo
+    return "%s (%s)" % (provider or "?", modelo or "?")
+
+
+def cmd_cerebro(argumentos):
+    """Troca o cerebro pelo grupo: `cerebro claude|opus|sonnet|gpt|auto`.
+
+    A escolha vira $DATA/cerebro.json, que a deteccao do boot respeita — senao
+    o proximo Update da stack desfaria, calado, o que o cirurgiao pediu.
+    """
+    escolha = (argumentos[0].lower() if argumentos else "")
+    provider, modelo = _cerebro_atual()
+
+    if not escolha or escolha in ("status", "qual", "mostrar"):
+        extra = ""
+        if not _tem_chave_claude():
+            extra = ("\nPara usar o Claude falta a chave dele na configuracao do servidor "
+                     "(ANTHROPIC_API_KEY na stack).")
+        _ok("cerebro agora: %s%s" % (_nome_humano(provider, modelo), extra))
+
+    exige_grupo_principal("cerebro")
+
+    if escolha in ("claude", "anthropic", "sonnet", "opus"):
+        if not _tem_chave_claude():
+            _erro("nao tem chave do Claude nesta instalacao.",
+                  "Diga ao cirurgiao, em uma linha, que para usar o Claude ele precisa colar a "
+                  "chave (ANTHROPIC_API_KEY) na configuracao do servidor — e que ate la voce "
+                  "segue no GPT.")
+        pref = {"provider": "anthropic"}
+        if escolha in ("sonnet", "opus"):
+            pref["familia"] = escolha
+    elif escolha in ("gpt", "openai", "chatgpt"):
+        pref = {"provider": "openai-api"}
+    elif escolha in ("auto", "automatico", "padrao"):
+        pref = {"provider": "auto"}
+    else:
+        _erro("nao entendi '%s'." % escolha,
+              "Use: cerebro claude | cerebro opus | cerebro sonnet | cerebro gpt | cerebro auto")
+
+    _snapshot("cerebro: %s" % escolha, prefixo="cerebro")
+    CEREBRO.write_text(json.dumps(pref, ensure_ascii=False), encoding="utf-8")
+
+    escolhido = subprocess.run(
+        ["/opt/hermes/.venv/bin/python", "/opt/copiloto/escolher-modelo.py"],
+        capture_output=True, text=True,
+    )
+    novo_prov = novo_mod = ""
+    for linha in (escolhido.stdout or "").splitlines():
+        if linha.startswith("provider="):
+            novo_prov = linha.split("=", 1)[1].strip()
+        elif linha.startswith("default="):
+            novo_mod = linha.split("=", 1)[1].strip()
+    if not novo_prov or not novo_mod:
+        _erro("nao consegui resolver o modelo agora (%s)." % (escolhido.stderr or "sem detalhe").strip()[:120])
+
+    subprocess.run(
+        ["/opt/hermes/.venv/bin/python", "/opt/copiloto/escolher-modelo.py",
+         "--aplicar", novo_prov, novo_mod],
+        capture_output=True, text=True,
+    )
+    r = subprocess.run(["/command/s6-svc", "-ru", "/run/service/gateway-default"],
+                       capture_output=True, text=True)
+    aviso = "" if r.returncode == 0 else "\n(nao consegui reiniciar agora; vale na proxima atualizacao)"
+    _ok("cerebro trocado para %s.%s\nAvise em uma linha ('pronto, agora estou usando o %s') — "
+        "sem citar arquivo nem comando."
+        % (_nome_humano(novo_prov, novo_mod), aviso, _nome_humano(novo_prov, novo_mod)))
 
 
 # ------------------------------------------------------- acesso ao servidor
@@ -501,6 +629,8 @@ def main():
         cmd_site(positivos)
     elif v in ("servidor", "ssh", "host"):
         cmd_servidor()
+    elif v in ("cerebro", "modelo", "cabeca"):
+        cmd_cerebro(positivos)
     else:
         print(USO)
         sys.exit(2)

@@ -156,14 +156,46 @@ def aplicar(provider, modelo):
     print("modelo=atualizado para %s/%s" % (provider, modelo), file=sys.stderr)
 
 
+def preferencia():
+    """Escolha manual do cirurgiao, feita por `copiloto cerebro <...>`.
+
+    Vive em $DATA/cerebro.json e ganha da deteccao automatica — senao a proxima
+    atualizacao da stack desfaria a troca que ele pediu no grupo. "auto" (ou
+    arquivo ausente) devolve a decisao para a deteccao.
+    """
+    caminho = os.path.join(os.environ.get("COPILOTO_DATA", "/opt/data"), "cerebro.json")
+    try:
+        with open(caminho) as fh:
+            d = json.load(fh) or {}
+    except Exception:
+        return {}
+    if (d.get("provider") or "auto") == "auto":
+        return {}
+    return d
+
+
 def main():
     if len(sys.argv) > 3 and sys.argv[1] == "--aplicar":
         aplicar(sys.argv[2], sys.argv[3])
         return
 
+    pref = preferencia()
+    if pref.get("familia"):
+        os.environ["COPILOTO_FAMILIA"] = pref["familia"]
+    if pref.get("modelo"):
+        os.environ["COPILOTO_MODELO"] = pref["modelo"]
+
     chave = (limpa(os.environ.get("ANTHROPIC_API_KEY"))
              or limpa(os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"))
              or limpa(os.environ.get("ANTHROPIC_TOKEN")))
+
+    if pref.get("provider") == "openai-api":
+        modelo = limpa_texto(pref.get("modelo")) or FALLBACK_OPENAI
+        print("provider=openai-api")
+        print("default=%s" % modelo)
+        print("motivo=OpenAI escolhido no grupo (cerebro.json)", file=sys.stderr)
+        return
+
     if not chave:
         modelo = limpa_texto(os.environ.get("COPILOTO_MODELO")) or FALLBACK_OPENAI
         print("provider=openai-api")

@@ -86,9 +86,48 @@ o texto do botão, a cor?"). Nada de caminho de arquivo nem nome de comando pro 
 - **Cor:** escolha **uma** cor de marca coerente com o consultório e escreva no `--brand`. Verde
   clínico `#0b5c4e`, azul `#12456b`, grafite `#26303a`, bordô `#7a2231`. Uma só. Nunca deixe
   `[[COR_PRINCIPAL]]`.
-- **Texto curto e concreto.** Frase de hero com no máximo 10 palavras. Parágrafo de 2 a 3 linhas.
-  Nada de "excelência, qualidade e compromisso" — diga o que o paciente ganha, em português de gente.
 - **Emoji só nos `icone`/botões** do modelo. Não espalhe pelo texto.
+- **Só o título é curto.** A frase do hero tem até ~10 palavras. O resto da página, não: veja a
+  seção de conteúdo abaixo.
+
+## Conteúdo — página rasa é tão ruim quanto página feia
+
+O modelo é o **piso**, não o teto. Ele te dá a estrutura e o acabamento; o valor da página é o que
+você escreve dentro. Uma página com um parágrafo por seção não serve para ninguém: o paciente lê em
+15 segundos, não tira nenhuma dúvida e liga no consultório do mesmo jeito.
+
+**Escreva como quem explica ao paciente sentado na cadeira.** Concreto, com número, prazo, exemplo e
+o porquê. "Evite canudo" é uma instrução; "evite canudo por 7 dias — a sucção puxa o coágulo que
+está fechando a ferida, e é essa a causa da dor forte que costuma aparecer no terceiro dia" é uma
+orientação que o paciente entende e cumpre.
+
+**Alvo por tipo de página** (contando só o texto visível):
+
+| Página | Tamanho | O que não pode faltar |
+|---|---|---|
+| Landing de captação | **900–1500 palavras** | dor do paciente, como o tratamento resolve, como é o passo a passo, o que está incluso, quanto tempo leva, recuperação, quem é o cirurgião, 6–10 perguntas frequentes |
+| Material do paciente | **800–1400 palavras** | sinais de alerta, dia a dia da recuperação, o que é normal e o que não é, medicação, alimentação com exemplos, higiene, retorno, 8–12 dúvidas |
+| Institucional | **700–1200 palavras** | cada tratamento explicado de verdade (o que é, quando é indicado, como é feito, recuperação), formação, onde atende |
+| Documento/relatório | o que o caso pedir | não invente volume: aqui, completo é melhor que longo |
+
+**Acrescente seções.** O modelo traz um esqueleto; se o assunto pede mais, **duplique os blocos** e
+crie seções novas com as mesmas classes. Uma landing boa costuma ter 8–10 seções, não 5. Um FAQ com
+3 perguntas é um FAQ pela metade — escreva 6 a 12, respondendo o que o paciente pergunta de verdade
+("dói?", "quanto tempo fico inchado?", "posso trabalhar no dia seguinte?", "meu convênio cobre?",
+"e se eu tiver pressão alta / diabetes?").
+
+**Cada resposta e cada parágrafo com substância:** 3 a 6 linhas, com o motivo junto. Resposta de uma
+linha em FAQ é desperdício de pergunta.
+
+**O que continua proibido:** encher linguiça. "Excelência, qualidade e compromisso", "tecnologia de
+ponta", "equipe altamente qualificada" — isso não é conteúdo denso, é conteúdo vazio, e é pior que
+texto curto. Se você não sabe o dado (preço, prazo do convênio, marca do implante), **não invente**:
+escreva o que é verdade em geral e deixe o específico para o cirurgião confirmar.
+
+**Página longa precisa de respiro:** alterne `faixa` (fundo alternado) entre as seções, use
+`grade-3` para listas de itens, `passos` para sequência, `checklist` para o que fazer/evitar,
+`tabela-rolavel` para comparação e `aviso` para o que é crítico. É isso que faz 1200 palavras
+parecerem leves em vez de um paredão.
 
 ## Imagens
 

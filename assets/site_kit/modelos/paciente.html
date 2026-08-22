@@ -1,4 +1,10 @@
 <!doctype html>
+<!--
+  MODELO DE MATERIAL DO PACIENTE — esqueleto minimo, nao teto.
+  Cada orientacao vem com o MOTIVO junto ("evite canudo por 7 dias — a succao
+  puxa o coagulo..."). Duplique blocos e crie secoes quando o caso pedir.
+  Alvo: 800 a 1400 palavras de texto visivel.
+-->
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
@@ -43,6 +49,8 @@
         <li>[[ORIENTACAO_24H_2]]</li>
         <li>[[ORIENTACAO_24H_3]]</li>
         <li>[[ORIENTACAO_24H_4]]</li>
+        <li>[[ORIENTACAO_24H_5]]</li>
+        <li>[[ORIENTACAO_24H_6]]</li>
       </ul>
 
       <h2>O que evitar</h2>
@@ -50,6 +58,8 @@
         <li>[[EVITAR_1]]</li>
         <li>[[EVITAR_2]]</li>
         <li>[[EVITAR_3]]</li>
+        <li>[[EVITAR_4]]</li>
+        <li>[[EVITAR_5]]</li>
       </ul>
 
       <h2>Alimentação</h2>
@@ -62,13 +72,33 @@
 
   <section class="faixa compacta">
     <div class="estreito pilha">
+      <h2>O que é normal e o que não é</h2>
+      <p>[[PARAGRAFO_DE_ABERTURA_TRANQUILIZANDO_3_A_5_LINHAS]]</p>
+      <div class="tabela-rolavel">
+        <table>
+          <thead><tr><th>Sintoma</th><th>Esperado</th><th>Procure o consultório se</th></tr></thead>
+          <tbody>
+            <tr><td>[[SINTOMA_1]]</td><td>[[NORMAL_1]]</td><td>[[ALERTA_1]]</td></tr>
+            <tr><td>[[SINTOMA_2]]</td><td>[[NORMAL_2]]</td><td>[[ALERTA_2]]</td></tr>
+            <tr><td>[[SINTOMA_3]]</td><td>[[NORMAL_3]]</td><td>[[ALERTA_3]]</td></tr>
+            <tr><td>[[SINTOMA_4]]</td><td>[[NORMAL_4]]</td><td>[[ALERTA_4]]</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="compacta">
+    <div class="estreito pilha">
       <h2>Medicações prescritas</h2>
+      <p>[[COMO_TOMAR_EM_GERAL_3_A_5_LINHAS]]</p>
       <div class="tabela-rolavel">
         <table>
           <thead><tr><th>Remédio</th><th>Para quê</th><th>Como tomar</th><th>Por quantos dias</th></tr></thead>
           <tbody>
             <tr><td>[[REMEDIO_1]]</td><td>[[PARA_QUE_1]]</td><td>[[COMO_TOMAR_1]]</td><td>[[DIAS_1]]</td></tr>
             <tr><td>[[REMEDIO_2]]</td><td>[[PARA_QUE_2]]</td><td>[[COMO_TOMAR_2]]</td><td>[[DIAS_2]]</td></tr>
+            <tr><td>[[REMEDIO_3]]</td><td>[[PARA_QUE_3]]</td><td>[[COMO_TOMAR_3]]</td><td>[[DIAS_3]]</td></tr>
           </tbody>
         </table>
       </div>
@@ -80,9 +110,10 @@
     <div class="estreito pilha">
       <h2>Como costuma ser a recuperação</h2>
       <ol class="passos">
-        <li><div><h3>[[FASE_1_EX_PRIMEIRAS_48H]]</h3><p>[[O_QUE_ESPERAR_1]]</p></div></li>
-        <li><div><h3>[[FASE_2]]</h3><p>[[O_QUE_ESPERAR_2]]</p></div></li>
-        <li><div><h3>[[FASE_3]]</h3><p>[[O_QUE_ESPERAR_3]]</p></div></li>
+        <li><div><h3>[[FASE_1_EX_PRIMEIRAS_48H]]</h3><p>[[O_QUE_ESPERAR_3_A_5_LINHAS_1]]</p></div></li>
+        <li><div><h3>[[FASE_2]]</h3><p>[[O_QUE_ESPERAR_3_A_5_LINHAS_2]]</p></div></li>
+        <li><div><h3>[[FASE_3]]</h3><p>[[O_QUE_ESPERAR_3_A_5_LINHAS_3]]</p></div></li>
+        <li><div><h3>[[FASE_4]]</h3><p>[[O_QUE_ESPERAR_3_A_5_LINHAS_4]]</p></div></li>
       </ol>
     </div>
   </section>
@@ -90,9 +121,25 @@
   <section class="compacta">
     <div class="estreito pilha">
       <h2>Dúvidas comuns</h2>
-      <details class="faq"><summary>[[PERGUNTA_1]]</summary><p>[[RESPOSTA_1]]</p></details>
-      <details class="faq"><summary>[[PERGUNTA_2]]</summary><p>[[RESPOSTA_2]]</p></details>
-      <details class="faq"><summary>[[PERGUNTA_3]]</summary><p>[[RESPOSTA_3]]</p></details>
+      <details class="faq"><summary>[[PERGUNTA_1]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_1]]</p></details>
+      <details class="faq"><summary>[[PERGUNTA_2]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_2]]</p></details>
+      <details class="faq"><summary>[[PERGUNTA_3]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_3]]</p></details>
+      <details class="faq"><summary>[[PERGUNTA_4]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_4]]</p></details>
+      <details class="faq"><summary>[[PERGUNTA_5]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_5]]</p></details>
+      <details class="faq"><summary>[[PERGUNTA_6]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_6]]</p></details>
+      <details class="faq"><summary>[[PERGUNTA_7]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_7]]</p></details>
+      <details class="faq"><summary>[[PERGUNTA_8]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_8]]</p></details>
+    </div>
+  </section>
+
+  <section class="faixa compacta">
+    <div class="estreito pilha">
+      <h2>Seu retorno</h2>
+      <p>[[QUANDO_E_O_RETORNO_E_O_QUE_ACONTECE_NELE_3_A_5_LINHAS]]</p>
+      <ul class="checklist">
+        <li>[[LEVAR_1]]</li>
+        <li>[[LEVAR_2]]</li>
+      </ul>
     </div>
   </section>
 

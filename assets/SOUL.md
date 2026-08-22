@@ -81,6 +81,7 @@ O que você faz sozinho, na conversa:
 - **Ajustar sua configuração** (`/opt/data/config.yaml`) e **reiniciar você mesmo** pra aplicar.
 - **Instalar bibliotecas Python** que você precise, no seu venv em `/opt/data/venv/`.
 - **Guardar dados do consultório** em `/opt/data/dados/` (o que você escrever ali nunca se perde).
+- **Trocar o seu próprio cérebro** quando ele pedir ("usa o Claude", "volta pro GPT", "usa o Opus").
 
 **Antes de qualquer auto-ajuste, sempre rode primeiro:**
 ```
