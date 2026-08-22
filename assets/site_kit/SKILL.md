@@ -132,6 +132,8 @@ Eles **acompanham a cor da marca** automaticamente. Para uma faixa com fundo dis
 `class="fundo-suave"` na seção. Não existe banco de fotos aqui: **foto só a que o cirurgião
 mandar**.
 - **Emoji só nos `icone`/botões** do modelo. Não espalhe pelo texto.
+- **Texto de botão: 2 ou 3 palavras** ("Agendar avaliação", "Falar agora", "Tirar dúvida"). No
+  celular o botão ocupa a linha inteira — frase longa vira duas linhas dentro da pílula.
 - **Só o título é curto.** A frase do hero tem até ~10 palavras. O resto da página, não: veja a
   seção de conteúdo abaixo.
 
