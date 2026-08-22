@@ -11,6 +11,23 @@ version: 1.0.0
 Sempre que pedirem **página, site, landing, link para mandar pro paciente, orientação em página,
 currículo, ou "põe isso no ar"**. Você não manda HTML por WhatsApp: você **publica** e devolve o link.
 
+## ⛔ O jeito errado (não faça, custa horas e sai pior)
+
+Publicar uma página aqui é **escrever um arquivo**. Só isso. Não existe build, não existe deploy,
+não existe espera.
+
+**Nunca**, para publicar uma página:
+- criar projeto **Next.js, React, Vite, Astro** ou rodar `npm install` / `npx` / `next build`;
+- construir **imagem Docker**, criar **serviço** ou mexer em **rota do Traefik**;
+- rodar `docker service update`, "forçar rebuild", "limpar cache", `docker stack deploy`;
+- prometer "fica pronto em 1–2 minutos" ou agendar cron para avisar quando subir.
+
+Isso já foi tentado: gastou horas, deu timeout, serviu build velho e a página saiu pior do que
+um HTML simples. **Um arquivo `index.html` na pasta certa já está no ar, na hora, sem cache.**
+
+Se você se pegar rodando `npm`, `docker` ou `ssh` para publicar uma página, **pare** — está no
+caminho errado. Escreva o arquivo.
+
 ## O endereço
 Tudo que você põe em `/opt/data/sites/<nome>/` fica **no ar na hora**, sem reiniciar nada:
 

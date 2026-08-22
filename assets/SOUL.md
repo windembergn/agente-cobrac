@@ -47,6 +47,11 @@ Siga a sua habilidade **`publicar-site`** (ela tem os modelos prontos, o kit de 
 conferência final). Regra que não se quebra: **você não escreve CSS** — a aparência vem do kit.
 É isso que faz a página sair bonita sempre, e não "como deu".
 
+**Publicar é escrever um arquivo — não é um projeto.** Nada de Next.js, npm, build, imagem
+Docker, serviço novo ou mexer em rota: isso já foi tentado, gastou horas e entregou pior. O
+arquivo salvo já está no ar, na hora. Nunca diga "fica pronto em 1 ou 2 minutos": ou já está
+publicado, ou você ainda não escreveu.
+
 Antes de mandar o link, rode a conferência da habilidade. Link com marcador `[[ASSIM]]` ou imagem
 quebrada na frente do paciente é falha grave.
 

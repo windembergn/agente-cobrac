@@ -25,9 +25,12 @@ import urllib.request
 TIMEOUT = 12
 PLACEHOLDERS = ("cole", "sua-chave", "sk-cole", "xxx", "troque", "placeholder")
 
-# Familia preferida por padrao. Sonnet e' o melhor custo/qualidade para um
-# agente que roda o dia inteiro; quem quiser o topo poe COPILOTO_MODELO=opus.
-FAMILIA_PADRAO = os.environ.get("COPILOTO_FAMILIA", "sonnet").strip().lower()
+# Familia preferida por padrao, decidida pelo TIPO da credencial:
+#   - token do plano (sk-ant-oat*, o do `claude setup-token`): Opus, porque o
+#     consumo ja esta pago na assinatura;
+#   - chave de API avulsa (sk-ant-api*): Sonnet, melhor custo/qualidade para um
+#     agente que fica ligado o dia inteiro.
+# COPILOTO_FAMILIA=opus|sonnet manda mais que isso.
 FALLBACK_ANTHROPIC = "claude-sonnet-4-5-20250929"
 FALLBACK_OPENAI = "gpt-5"
 
@@ -60,10 +63,32 @@ def peso(modelo_id):
     return tuple(versao) + tuple(data or [0])
 
 
+def eh_token_do_plano(chave):
+    """sk-ant-oat* = setup-token do Claude Code (assinatura), nao chave de API."""
+    return chave.startswith("sk-ant-oat") or chave.startswith("cc-")
+
+
+def familia_preferida(chave):
+    escolhida = limpa_texto(os.environ.get("COPILOTO_FAMILIA"))
+    if escolhida:
+        return escolhida.lower()
+    return "opus" if eh_token_do_plano(chave) else "sonnet"
+
+
 def lista_modelos(chave):
+    # Token do plano nao passa em x-api-key: a API so o aceita como Bearer, e
+    # so com o beta de oauth ligado. E' a mesma distincao que o Hermes faz em
+    # agent/anthropic_adapter.py — se mudar aqui, conferir la tambem.
+    if eh_token_do_plano(chave):
+        cabecalhos = {
+            "Authorization": "Bearer " + chave,
+            "anthropic-version": "2023-06-01",
+            "anthropic-beta": "oauth-2025-04-20",
+        }
+    else:
+        cabecalhos = {"x-api-key": chave, "anthropic-version": "2023-06-01"}
     req = urllib.request.Request(
-        "https://api.anthropic.com/v1/models?limit=100",
-        headers={"x-api-key": chave, "anthropic-version": "2023-06-01"},
+        "https://api.anthropic.com/v1/models?limit=100", headers=cabecalhos,
     )
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
         corpo = json.loads(r.read().decode("utf-8"))
@@ -93,7 +118,7 @@ def escolhe_claude(chave):
         return (FALLBACK_ANTHROPIC,
                 "COPILOTO_MODELO='%s' nao existe nesta conta; usando o padrao" % forcado)
 
-    for familia in (FAMILIA_PADRAO, "sonnet", "opus"):
+    for familia in (familia_preferida(chave), "opus", "sonnet"):
         candidatos = [i for i in ids if ("claude-%s" % familia) in i]
         if candidatos:
             melhor = sorted(candidatos, key=peso, reverse=True)[0]
@@ -136,12 +161,14 @@ def main():
         aplicar(sys.argv[2], sys.argv[3])
         return
 
-    chave = limpa(os.environ.get("ANTHROPIC_API_KEY"))
+    chave = (limpa(os.environ.get("ANTHROPIC_API_KEY"))
+             or limpa(os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"))
+             or limpa(os.environ.get("ANTHROPIC_TOKEN")))
     if not chave:
         modelo = limpa_texto(os.environ.get("COPILOTO_MODELO")) or FALLBACK_OPENAI
         print("provider=openai-api")
         print("default=%s" % modelo)
-        print("motivo=sem ANTHROPIC_API_KEY — seguindo no OpenAI", file=sys.stderr)
+        print("motivo=sem chave da Anthropic — seguindo no OpenAI", file=sys.stderr)
         return
 
     modelo, motivo = escolhe_claude(chave)
