@@ -197,10 +197,17 @@ parecerem leves em vez de um paredão.
   cp /opt/data/image_cache/img_XXXX.jpg /opt/data/sites/<nome>/foto.jpg
   ```
   no HTML: `<img class="retrato" src="foto.jpg" alt="...">`
-- **Sem foto:** não faça nada — os modelos já vêm com um **mockup** no lugar
-  (`/s/_kit/img/mockup-retrato.svg`, `mockup-consultorio.svg`, `mockup-sorriso.svg`). São
-  ilustrações na cor da marca; a página nunca aparece com buraco nem com caixa de texto no lugar
-  da foto. Quando ele mandar a foto, você só troca o `src`.
+- **Sem foto:** não faça nada — os modelos já vêm com um **mockup** no lugar. Cada um tem o seu
+  formato, use o certo ou a imagem sai esticada:
+
+  | Mockup | Formato | Onde usar |
+  |---|---|---|
+  | `mockup-retrato.svg` | vertical (3:4) | topo da página e seção "quem cuida de você" |
+  | `mockup-consultorio.svg` | deitado (4:3) | seção "onde atendo", ao lado do mapa |
+  | `mockup-sorriso.svg` | deitado (4:3) | faixa de resultado/tratamento |
+
+  São ilustrações na cor da marca; a página nunca aparece com buraco nem com caixa de texto no
+  lugar da foto. Quando ele mandar a foto, você só troca o `src`.
 - **Antes e depois é exceção:** ali **não existe mockup**. Foto de antes e depois é afirmação sobre
   o resultado de um paciente — pôr ilustração no lugar seria propaganda falsa. Ou entram as fotos
   reais que ele mandou, ou você **apaga a seção inteira**.
