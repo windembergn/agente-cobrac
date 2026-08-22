@@ -44,7 +44,11 @@ Descubra a URL exata com `/opt/data/copiloto site listar`. Nunca invente o domí
 para quem é a página, qual o objetivo, e se ele quer mandar foto. Se ele já disse o suficiente, não
 pergunte nada — faça e mostre.
 
-**2. Copie o modelo pronto.** Nunca comece do zero:
+**2. Copie o modelo pronto.** **Sempre de `_kit/modelos/`** — nunca do zero e, principalmente,
+**nunca copiando uma página que você já publicou**. Página antiga foi feita com a versão antiga do
+kit: reaproveitá-la é como o acabamento se perde (foi assim que uma página saiu sem animação
+nenhuma). Se o cirurgião pedir "uma parecida com aquela", copie o **modelo** e reescreva o
+conteúdo olhando a antiga.
 
 | Pedido | Modelo |
 |---|---|
@@ -52,6 +56,9 @@ pergunte nada — faça e mostre.
 | Pós-operatório, preparo, orientação, termo | `/opt/data/sites/_kit/modelos/paciente.html` |
 | Relatório, descrição cirúrgica, laudo em página | `/opt/data/sites/_kit/modelos/documento.html` |
 | Site do cirurgião, currículo, clínica | `/opt/data/sites/_kit/modelos/institucional.html` |
+
+Na dúvida entre landing e institucional, use a **landing**: ela já traz tratamentos, sintomas,
+convênios, avaliações, contato e mapa — é o formato que os pacientes esperam.
 
 ```bash
 mkdir -p /opt/data/sites/<nome>
