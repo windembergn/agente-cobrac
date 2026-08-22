@@ -39,7 +39,7 @@
   --step-2:  clamp(1.42rem, 1.3rem + .58vw, 1.8rem);
   --step-3:  clamp(1.69rem, 1.5rem + .93vw, 2.3rem);
   --step-4:  clamp(2.02rem, 1.72rem + 1.45vw, 2.95rem);
-  --step-5:  clamp(2.4rem, 1.94rem + 2.2vw, 3.8rem);
+  --step-5:  clamp(2.15rem, 1.7rem + 2.2vw, 3.6rem);
 
   /* Ritmo */
   --sp-1: .25rem;  --sp-2: .5rem;   --sp-3: .75rem;  --sp-4: 1rem;
@@ -160,6 +160,7 @@ section.compacta { padding-block: var(--sp-6); }
 .pilha > * + * { margin-top: var(--sp-4); }
 .pilha-larga > * + * { margin-top: var(--sp-6); }
 .centro { text-align: center; }
+.centro > * + * { margin-top: var(--sp-3); }
 .centro p, .centro .lede { margin-inline: auto; }
 
 .grade { display: grid; gap: var(--sp-5); }
@@ -212,7 +213,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin-block: var(--sp-6); }
   display: inline-flex; align-items: center; justify-content: center; gap: .55em;
   padding: .78em 1.5em; border-radius: var(--radius-pill);
   background: var(--brand); color: var(--brand-ink);
-  font-weight: 600; font-size: var(--step-0); line-height: 1;
+  font-weight: 600; font-size: var(--step-0); line-height: 1.25; text-align: center;
   text-decoration: none; border: 1px solid transparent; cursor: pointer;
   box-shadow: var(--shadow-sm);
   transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
@@ -522,8 +523,8 @@ html.js .revelar-d3 { transition-delay: .24s; }
 .mapa iframe { display: block; width: 100%; aspect-ratio: 16/10; border: 0; }
 
 /* --------------------------------------------------------- logo no topo */
-.marca img { height: 38px; width: auto; border-radius: 0; }
-.marca { display: inline-flex; align-items: center; gap: .6rem; }
+.marca { display: inline-flex; align-items: center; gap: 0; white-space: nowrap; }
+.marca img { height: 38px; width: auto; border-radius: 0; margin-right: .55rem; }
 
 /* ------------------------------------------------------------ redes */
 .redes { display: flex; gap: var(--sp-3); flex-wrap: wrap; }
@@ -663,5 +664,14 @@ h1 .destaque, h2 .destaque { display: inline; }
 .fundo-suave {
   background-color: var(--surface-2);
   background-image: url("/s/_kit/img/fundo-linhas.svg");
-  background-size: 220px;
+  background-size: 340px;
+}
+
+/* No celular o cabecalho e' so' a marca: o CTA vive na barra fixa de baixo, e
+   um botao repetido ali em cima roubava um terco da tela. */
+@media (max-width: 760px) {
+  .topo nav { display: none; }
+  .topo .container { justify-content: center; padding-block: var(--sp-2); }
+  .marca { font-size: var(--step-0); }
+  .marca img { height: 30px; }
 }
