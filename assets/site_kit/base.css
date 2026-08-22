@@ -7,7 +7,7 @@
 
 /* ---------------------------------------------------------------- tokens */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   /* PADRAO: consultorio — branco e azul, clean, moderno.
      Trocar so --brand/--brand-soft personaliza a pagina inteira. */
@@ -60,23 +60,12 @@
   --measure-sm: 46ch;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-tema="claro"]) {
-    --brand-soft:  #0f2438;
-    --bg:          #0c1219;
-    --surface:     #121b24;
-    --surface-2:   #17222d;
-    --ink:         #eef4f9;
-    --ink-soft:    #c4d1dd;
-    --ink-muted:   #92a3b3;
-    --line:        #22303c;
-    --line-strong: #334453;
-    --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
-    --shadow-md: 0 4px 12px rgba(0,0,0,.45), 0 12px 32px rgba(0,0,0,.35);
-    --shadow-lg: 0 8px 24px rgba(0,0,0,.5), 0 32px 64px rgba(0,0,0,.45);
-  }
-}
+/* Escuro existe, mas so' quando a pagina pede de proposito
+   (<html data-tema="escuro">). Pagina de consultorio e' branca sempre: o modo
+   escuro do celular do paciente nao pode virar o site do cirurgiao do avesso —
+   foi exatamente o que aconteceu na primeira versao. */
 :root[data-tema="escuro"] {
+  color-scheme: dark;
   --brand-soft:  #0f2438;
   --bg:          #0c1219;
   --surface:     #121b24;
