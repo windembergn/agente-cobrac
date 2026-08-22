@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-label="Espaco reservado para a foto do consultorio">
+<defs>
+  <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#12699f"/><stop offset=".55" stop-color="#0e5aa7"/><stop offset="1" stop-color="#0a3f77"/>
+  </linearGradient>
+  <radialGradient id="b" cx=".22" cy=".14" r=".75">
+    <stop offset="0" stop-color="#ffffff" stop-opacity=".22"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+  </radialGradient>
+</defs>
+<rect width="100%%" height="100%%" fill="url(#g)"/>
+<rect width="100%%" height="100%%" fill="url(#b)"/>
+<g opacity=".13" fill="none" stroke="#fff" stroke-width="1.4">
+  <circle cx="318" cy="66" r="120"/><circle cx="318" cy="66" r="86"/>
+</g>
+<g fill="#fff" opacity=".92">
+  <circle cx="300" cy="62" r="26"/>
+  <path d="M300 88v34" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+</g>
+<g opacity=".22" fill="#fff"><path d="M300 88 268 150h64L300 88Z"/></g>
+<g fill="#fff" opacity=".92">
+  <rect x="58" y="176" width="196" height="26" rx="13"/>
+  <path d="M92 176V132c0-13 10-24 24-24h44c13 0 24 11 24 24v44Z"/>
+  <rect x="84" y="202" width="20" height="52" rx="8"/>
+  <rect x="208" y="202" width="20" height="52" rx="8"/>
+</g>
+<g fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".55">
+  <path d="M254 190h56"/>
+</g>
+</svg>

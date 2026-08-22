@@ -354,10 +354,10 @@ dl.dados dd { margin: 0; }
   position: fixed; right: 1.1rem; bottom: 1.1rem; z-index: 50;
   display: inline-flex; align-items: center; gap: .5em;
   padding: .8em 1.25em; border-radius: var(--radius-pill);
-  background: #25d366; color: #06301a; font-weight: 650; text-decoration: none;
+  background: var(--brand); color: var(--brand-ink); font-weight: 650; text-decoration: none;
   box-shadow: var(--shadow-lg);
 }
-.zap-flutuante:hover { color: #06301a; transform: translateY(-2px); }
+.zap-flutuante:hover { background: var(--brand-forte); color: var(--brand-ink); transform: translateY(-2px); }
 
 /* -------------------------------------------------------------- formulario */
 form.contato { display: grid; gap: var(--sp-4); max-width: 520px; }
@@ -429,14 +429,14 @@ html.js .revelar-d3 { transition-delay: .24s; }
   100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 0%, transparent); }
 }
 @keyframes pulso-zap {
-  0%   { box-shadow: 0 0 0 0 rgba(37,211,102,.55); }
-  70%  { box-shadow: 0 0 0 18px rgba(37,211,102,0); }
-  100% { box-shadow: 0 0 0 0 rgba(37,211,102,0); }
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 50%, transparent); }
+  70%  { box-shadow: 0 0 0 18px color-mix(in srgb, var(--brand) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 0%, transparent); }
 }
 .btn-pulso { animation: pulso-marca 2.4s ease-out infinite; }
 .zap-flutuante { animation: pulso-zap 2.6s ease-out infinite; }
-.btn-zap { background: var(--zap); color: #06301a; }
-.btn-zap:hover { color: #06301a; background: #1fbe5b; }
+.btn-zap { background: var(--brand); color: var(--brand-ink); }
+.btn-zap:hover { background: var(--brand-forte); color: var(--brand-ink); }
 
 /* ------------------------------------------------------------- carrossel */
 /* Rolagem com encaixe, sem biblioteca. As setas sao opcionais (kit.js). */
@@ -497,14 +497,23 @@ html.js .revelar-d3 { transition-delay: .24s; }
 
 /* ------------------------------------------------------- convenios/logos */
 .logos {
-  display: flex; flex-wrap: wrap; gap: var(--sp-5) var(--sp-7);
+  display: flex; flex-wrap: wrap; gap: var(--sp-4);
   align-items: center; justify-content: center;
 }
 .logos img { height: 34px; width: auto; filter: grayscale(1); opacity: .62; transition: all .25s ease; }
 .logos img:hover { filter: none; opacity: 1; }
 .logos span {
-  color: var(--ink-muted); font-weight: 620; font-size: var(--step-0);
-  letter-spacing: .01em;
+  display: inline-flex; align-items: center; min-height: 52px;
+  padding: .7em 1.4em; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink-soft); font-weight: 620; font-size: var(--step-0);
+  letter-spacing: .01em; white-space: nowrap;
+}
+.logos span:hover { border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); color: var(--brand); }
+@media (max-width: 560px) {
+  .logos { gap: var(--sp-3); }
+  .logos span { font-size: var(--step--1); padding: .6em 1em; min-height: 44px; }
 }
 
 /* ------------------------------------------------------------------ mapa */

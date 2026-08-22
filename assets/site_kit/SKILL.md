@@ -111,8 +111,9 @@ O que já vem pronto e você só precisa **não estragar**:
   entrarem em cascata. Ao preencher, **não apague essas classes** — e se você criar uma seção nova,
   ponha nela também. A conferência recusa a página que não tiver nenhuma. Quem configurou o celular
   para menos movimento não vê animação — isso é automático, você não precisa fazer nada.
-- **Botão que pulsa:** `class="btn btn-zap btn-grande btn-pulso"` no botão principal de WhatsApp.
-  Verde de WhatsApp no CTA, azul no resto.
+- **Botão que pulsa:** `class="btn btn-zap btn-grande btn-pulso"` no botão principal.
+  **Todos os botões são azuis, da cor da marca** — inclusive os de WhatsApp. Verde no meio do azul
+  quebra a página.
 - **Barra fixa embaixo no celular** (`.barra-fixa`) e bolha no desktop (`.zap-flutuante`): já vêm
   no modelo, deixe as duas.
 - **Contadores que sobem sozinhos:** `<p class="numero" data-contar="3000" data-prefixo="+">0</p>`.
@@ -196,10 +197,13 @@ parecerem leves em vez de um paredão.
   cp /opt/data/image_cache/img_XXXX.jpg /opt/data/sites/<nome>/foto.jpg
   ```
   no HTML: `<img class="retrato" src="foto.jpg" alt="...">`
-- **Sem foto:** troque a `<img>` por uma caixa do kit, que já sai bonita:
-  ```html
-  <div class="hero-figura figura-vazia">Cirurgia bucomaxilofacial<br>com acompanhamento de perto</div>
-  ```
+- **Sem foto:** não faça nada — os modelos já vêm com um **mockup** no lugar
+  (`/s/_kit/img/mockup-retrato.svg`, `mockup-consultorio.svg`, `mockup-sorriso.svg`). São
+  ilustrações na cor da marca; a página nunca aparece com buraco nem com caixa de texto no lugar
+  da foto. Quando ele mandar a foto, você só troca o `src`.
+- **Antes e depois é exceção:** ali **não existe mockup**. Foto de antes e depois é afirmação sobre
+  o resultado de um paciente — pôr ilustração no lugar seria propaganda falsa. Ou entram as fotos
+  reais que ele mandou, ou você **apaga a seção inteira**.
 - **Nunca** use foto da internet, banco de imagem, link de outro site, nem invente `src`. Imagem
   quebrada estraga a página inteira.
 

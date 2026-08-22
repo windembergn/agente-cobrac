@@ -54,7 +54,9 @@
         <span class="selo-confianca">★ [[SELO_DE_CONFIANCA_EX_100_AVALIACOES_POSITIVAS]]</span>
         <p class="small muted">[[LINHA_DE_CREDENCIAL_CRO_E_EXPERIENCIA]]</p>
       </div>
-      <img class="hero-retrato revelar revelar-d1" src="[[FOTO_DO_CIRURGIAO]]" alt="[[NOME_COMPLETO]]">
+      <!-- Se o cirurgiao mandou foto, troque o src pelo arquivo dela. Sem foto,
+           deixe o mockup: ele ja e' da cor da marca e nunca aparece quebrado. -->
+      <img class="hero-retrato revelar revelar-d1" src="/s/_kit/img/mockup-retrato.svg" alt="[[NOME_COMPLETO]]">
     </div>
   </section>
 
@@ -139,8 +141,10 @@
     </div>
   </section>
 
-  <!-- ANTES E DEPOIS / GALERIA: so' com fotos que o cirurgiao mandou.
-       Sem fotos, APAGUE a secao — nunca invente imagem. -->
+  <!-- ANTES E DEPOIS: aqui NAO existe mockup, de proposito. Foto de antes e
+       depois e' afirmacao sobre resultado de paciente; imagem de enfeite no
+       lugar seria propaganda falsa. Ou entram as fotos reais que o cirurgiao
+       mandou, ou a secao inteira e' APAGADA. -->
   <section class="faixa">
     <div class="container pilha-larga">
       <div class="centro revelar">
@@ -151,12 +155,12 @@
       <div class="carrossel-caixa revelar">
         <div class="carrossel largo">
           <div class="antes-depois">
-            <figure><img src="[[FOTO_ANTES_1]]" alt="Antes"><figcaption>Antes</figcaption></figure>
-            <figure><img src="[[FOTO_DEPOIS_1]]" alt="Depois"><figcaption>Depois</figcaption></figure>
+            <figure><img src="[[FOTO_ANTES]]" alt="Antes"><figcaption>Antes</figcaption></figure>
+            <figure><img src="[[FOTO_DEPOIS]]" alt="Depois"><figcaption>Depois</figcaption></figure>
           </div>
           <div class="antes-depois">
-            <figure><img src="[[FOTO_ANTES_2]]" alt="Antes"><figcaption>Antes</figcaption></figure>
-            <figure><img src="[[FOTO_DEPOIS_2]]" alt="Depois"><figcaption>Depois</figcaption></figure>
+            <figure><img src="[[FOTO_ANTES]]" alt="Antes"><figcaption>Antes</figcaption></figure>
+            <figure><img src="[[FOTO_DEPOIS]]" alt="Depois"><figcaption>Depois</figcaption></figure>
           </div>
         </div>
       </div>
@@ -168,7 +172,7 @@
   <section id="sobre">
     <div class="container duas-colunas">
       <figure class="foto-legenda revelar">
-        <img src="[[FOTO_DO_CIRURGIAO]]" alt="[[NOME_COMPLETO]]">
+        <img src="/s/_kit/img/mockup-retrato.svg" alt="[[NOME_COMPLETO]]">
         <figcaption>
           <div class="nome">[[NOME_COMPLETO]]</div>
           <div class="cargo">[[ESPECIALIDADE]] · CRO [[CRO]]</div>
