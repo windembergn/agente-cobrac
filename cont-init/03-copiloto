@@ -5,7 +5,7 @@ DATA=/opt/data
 CFG="$DATA/config.yaml"
 FAB="$DATA/.fabrica"
 cd "$DATA" 2>/dev/null || true
-mkdir -p "$DATA/whatsapp" "$DATA/skills" "$DATA/dados" "$DATA/copiloto-backups" "$FAB"
+mkdir -p "$DATA/whatsapp" "$DATA/skills" "$DATA/dados" "$DATA/copiloto-backups" "$FAB" "$DATA/sites"
 
 # ---------------------------------------------------------------------------
 # 1) LINHA DE BASE DE FABRICA — regerada a CADA boot em .fabrica/
@@ -30,10 +30,23 @@ S=$(le_secret "$FAB/config.yaml")
 if [ -z "$S" ]; then S=$(le_secret "$CFG"); fi
 if [ -z "$S" ]; then S=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'); fi
 
+# ---------------------------------------------------------------------------
+# CEREBRO — Claude quando a stack trouxer ANTHROPIC_API_KEY, senao gpt-5.
+#
+# O modelo exato e' descoberto perguntando a propria API (o catalogo muda mais
+# rapido do que a imagem e' reconstruida). O script sai 0 sempre e imprime
+# duas linhas provider=/default=; o motivo vai para o log.
+# ---------------------------------------------------------------------------
+ESCOLHA=$(/opt/hermes/.venv/bin/python /opt/copiloto/escolher-modelo.py 2>>"$DATA/modelo-setup.log")
+MODEL_PROVIDER=$(echo "$ESCOLHA" | sed -n 's/^provider=//p' | tail -1)
+MODEL_DEFAULT=$(echo "$ESCOLHA" | sed -n 's/^default=//p' | tail -1)
+if [ -z "$MODEL_PROVIDER" ]; then MODEL_PROVIDER=openai-api; fi
+if [ -z "$MODEL_DEFAULT" ]; then MODEL_DEFAULT=gpt-5; fi
+
 cat > "$FAB/config.yaml" <<CFG
 model:
-  provider: openai-api
-  default: gpt-5
+  provider: $MODEL_PROVIDER
+  default: $MODEL_DEFAULT
 stt:
   enabled: true
   provider: openai
@@ -149,6 +162,12 @@ fi
 if [ ! -s "$FAB/skills_originais.txt" ]; then
   ls -1 "$DATA/skills" 2>/dev/null > "$FAB/skills_originais.txt" || true
 fi
+# A habilidade de publicar site vem da imagem, nao foi o agente que criou: sem
+# esta linha, uma instalacao antiga (cuja lista nasceu antes dela existir) a
+# trataria como "criada pelo agente" e o restaurar original a apagaria.
+if ! grep -qx "publicar-site" "$FAB/skills_originais.txt" 2>/dev/null; then
+  echo "publicar-site" >> "$FAB/skills_originais.txt"
+fi
 
 # ---------------------------------------------------------------------------
 # 3) MANUAL DE AUTO-AJUSTE — atualizado a CADA boot
@@ -159,6 +178,24 @@ fi
 # imagem. Por isso e' sobrescrito (o SOUL, que e' a persona, nao e').
 # ---------------------------------------------------------------------------
 [ -f /opt/copiloto/AGENTE.md ] && cp /opt/copiloto/AGENTE.md "$DATA/CLAUDE.md" || true
+
+# ---------------------------------------------------------------------------
+# 3b) SITES — kit de design e habilidade de publicar, atualizados a CADA boot
+#
+# Tudo que o agente escrever em $DATA/sites/<nome>/ fica no ar em
+# https://<dominio>/s/<nome> (servido pelo qr_server, que ja tem rota no
+# Traefik). Nao precisa de SSH, nao precisa reiniciar nada.
+#
+# O _kit (CSS + modelos) e a habilidade sao NOSSOS: sobrescrevemos sempre, como
+# o CLAUDE.md. Se a pagina sai feia, a correcao chega pela imagem — e' o mesmo
+# principio de "ferramenta instalada sem instrucao = agente que diz nao consigo".
+# ---------------------------------------------------------------------------
+if [ -d /opt/copiloto/site_kit ]; then
+  mkdir -p "$DATA/sites/_kit/modelos" "$DATA/skills/publicar-site"
+  cp /opt/copiloto/site_kit/base.css "$DATA/sites/_kit/base.css" 2>/dev/null || true
+  cp /opt/copiloto/site_kit/modelos/*.html "$DATA/sites/_kit/modelos/" 2>/dev/null || true
+  cp /opt/copiloto/site_kit/SKILL.md "$DATA/skills/publicar-site/SKILL.md" 2>/dev/null || true
+fi
 
 # Atalho que o agente usa: /opt/data/copiloto <verbo>
 cat > "$DATA/copiloto" <<'SH'
@@ -206,6 +243,16 @@ fi
 # dele, gera a URL com user_id e escreve o bloco mcp_servers no config.yaml.
 # Sem a chave, remove a entrada. Nunca derruba o boot (sai 0 sempre).
 /opt/hermes/.venv/bin/python /opt/copiloto/composio-setup.py || true
+
+# Cerebro — reconciliado a CADA boot, como o Composio: o config.yaml so nasce
+# no primeiro boot, entao sem isto quem ja tinha instalacao no ar colaria a
+# ANTHROPIC_API_KEY na stack e continuaria rodando gpt-5 sem entender por que.
+/opt/hermes/.venv/bin/python /opt/copiloto/escolher-modelo.py --aplicar \
+  "$MODEL_PROVIDER" "$MODEL_DEFAULT" 2>>"$DATA/modelo-setup.log" || true
+
+# Acesso do agente ao servidor (SSH root no host). Ligado por padrao; depende
+# do volume /root/.ssh na stack. Desliga com COPILOTO_HOST_SSH=off.
+[ -x /opt/copiloto/host-ssh.sh ] && /opt/copiloto/host-ssh.sh || true
 
 # Numeros de WhatsApp (slots) — reconciliado a CADA boot a partir do
 # $DATA/whatsapp/slots.json, que e' a fonte da verdade dos numeros e dos

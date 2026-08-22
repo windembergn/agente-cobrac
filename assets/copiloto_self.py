@@ -9,6 +9,12 @@ Verbos:
   status             o que ja foi alterado em relacao ao original
   fabrica            ultimo recurso: descarta TODOS os ajustes (nao desconecta o WhatsApp)
 
+  site listar             sites publicados e a URL de cada um
+  site conferir <nome>    procura marcador esquecido, link vazio e imagem faltando
+  site remover <nome>     tira do ar (guarda copia antes)
+
+  servidor           mostra se o acesso ao servidor (SSH) esta funcionando
+
 Trava de grupo: os verbos que MUDAM alguma coisa so rodam se a mensagem que esta
 sendo atendida veio do grupo principal (o primeiro ativado, campo "home" do slot 1).
 O bridge grava a origem do turno em whatsapp/turno_atual.json; sem marcador fresco
@@ -17,6 +23,7 @@ um pedido vindo de um grupo secundario.
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -304,6 +311,167 @@ def cmd_fabrica(forcado=False):
     sys.exit(0)
 
 
+# ---------------------------------------------------------------- sites
+SITES = DATA / "sites"
+DOMINIO = (os.environ.get("COPILOTO_DOMINIO") or os.environ.get("DOMAIN") or "").strip()
+
+
+def _url(nome):
+    if DOMINIO:
+        return "https://%s/s/%s/" % (DOMINIO, nome)
+    return "(dominio nao configurado na stack) /s/%s/" % nome
+
+
+def _sites():
+    if not SITES.is_dir():
+        return []
+    return sorted(
+        p.name for p in SITES.iterdir()
+        if p.is_dir() and not p.name.startswith(".") and p.name != "_kit"
+    )
+
+
+def cmd_site_listar():
+    nomes = _sites()
+    if not nomes:
+        _ok("nenhum site publicado ainda.\n"
+            "Para criar: copie um modelo de sites/_kit/modelos/ para sites/<nome>/index.html")
+    linhas = []
+    for n in nomes:
+        idx = SITES / n / "index.html"
+        marca = "" if idx.is_file() else "   [SEM index.html — nao abre]"
+        linhas.append("%-28s %s%s" % (n, _url(n), marca))
+    _ok("\n".join(linhas))
+
+
+# Marcador do modelo: [[NOME_DO_CAMPO]]
+_MARCADOR = re.compile(r"\[\[[A-Z0-9_]+\]\]")
+# src="..." / href="..." apontando para arquivo local (nao http, nao #, nao data:)
+_LOCAL = re.compile(r'(?:src|href)\s*=\s*"([^"]+)"', re.I)
+
+
+def cmd_site_conferir(nome):
+    if not nome:
+        _erro("diga qual site conferir.", "Ex: /opt/data/copiloto site conferir pos-operatorio")
+    pasta = SITES / nome
+    idx = pasta / "index.html"
+    if not idx.is_file():
+        _erro("nao achei a pagina de '%s'." % nome,
+              "Esperado: %s" % idx)
+
+    problemas = []
+    avisos = []
+    for pagina in sorted(pasta.rglob("*.html")):
+        rel = pagina.relative_to(pasta)
+        try:
+            html = pagina.read_text(encoding="utf-8", errors="replace")
+        except OSError as e:
+            problemas.append("%s: nao consegui ler (%s)" % (rel, e))
+            continue
+
+        faltando = sorted(set(_MARCADOR.findall(html)))
+        if faltando:
+            problemas.append("%s: sobrou marcador do modelo -> %s"
+                             % (rel, ", ".join(faltando[:8]) + ("..." if len(faltando) > 8 else "")))
+
+        for alvo in _LOCAL.findall(html):
+            a = alvo.strip()
+            if not a:
+                problemas.append("%s: tem link vazio (href=\"\")" % rel)
+                continue
+            if a.startswith(("http://", "https://", "#", "data:", "mailto:", "tel:", "//", "javascript:")):
+                continue
+            if a.startswith("/s/_kit/"):
+                if not (SITES / "_kit" / a[len("/s/_kit/"):]).exists():
+                    problemas.append("%s: o kit de design nao esta onde a pagina procura (%s)" % (rel, a))
+                continue
+            if a.startswith("/"):
+                avisos.append("%s: caminho absoluto '%s' so funciona se existir na raiz do dominio; "
+                              "use caminho relativo" % (rel, a))
+                continue
+            if not (pagina.parent / a.split("?")[0].split("#")[0]).exists():
+                problemas.append("%s: arquivo referenciado nao existe -> %s" % (rel, a))
+
+        if "/s/_kit/base.css" not in html:
+            problemas.append("%s: nao carrega o kit de design (a pagina vai sair feia). "
+                             "Faltou <link rel=\"stylesheet\" href=\"/s/_kit/base.css\">" % rel)
+        if "<title>" not in html.lower():
+            avisos.append("%s: sem <title> (o nome da aba fica feio)" % rel)
+        if 'name="viewport"' not in html:
+            avisos.append("%s: sem viewport (quebra no celular)" % rel)
+        aberto = html.lower().count("<section")
+        fechado = html.lower().count("</section>")
+        if aberto != fechado:
+            problemas.append("%s: HTML desbalanceado (%d <section> x %d </section>)"
+                             % (rel, aberto, fechado))
+
+    saida = []
+    if avisos:
+        saida.append("AVISOS (nao impedem publicar):")
+        saida += ["  - " + a for a in avisos]
+    if problemas:
+        saida.append("PROBLEMAS — conserte ANTES de mandar o link:")
+        saida += ["  - " + p for p in problemas]
+        print("\n".join(saida))
+        sys.exit(1)
+    saida.append("OK: '%s' esta no ar e sem pendencia." % nome)
+    saida.append("Link: " + _url(nome))
+    _ok("\n".join(saida))
+
+
+def cmd_site_remover(nome):
+    exige_grupo_principal("site remover")
+    if not nome:
+        _erro("diga qual site remover.")
+    pasta = SITES / nome
+    if not pasta.is_dir():
+        _erro("nao existe site chamado '%s'." % nome)
+    destino = BACKUPS / (time.strftime("%Y%m%d-%H%M%S") + "-site-" + nome)
+    destino.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(pasta, destino / nome, dirs_exist_ok=True)
+    (destino / "motivo.txt").write_text("site removido do ar\n", encoding="utf-8")
+    shutil.rmtree(pasta, ignore_errors=True)
+    _podar()
+    _ok("'%s' saiu do ar. Guardei uma copia — da pra voltar com 'desfaz o ultimo ajuste'." % nome)
+
+
+def cmd_site(argumentos):
+    sub = (argumentos[0].lower() if argumentos else "listar")
+    nome = argumentos[1] if len(argumentos) > 1 else ""
+    if sub in ("listar", "lista", "ls"):
+        cmd_site_listar()
+    elif sub in ("conferir", "checar", "revisar"):
+        cmd_site_conferir(nome)
+    elif sub in ("remover", "apagar", "excluir"):
+        cmd_site_remover(nome)
+    elif sub in ("url", "link"):
+        _ok(_url(nome) if nome else "diga o nome do site.")
+    else:
+        _erro("verbo de site desconhecido: %s" % sub,
+              "Use: site listar | site conferir <nome> | site remover <nome>")
+
+
+# ------------------------------------------------------- acesso ao servidor
+SSH_DIR = DATA / ".ssh"
+SSH_KEY = SSH_DIR / "id_ed25519"
+
+
+def cmd_servidor():
+    """Diz, em uma linha, se o SSH para a maquina hospedeira esta de pe."""
+    if not SSH_KEY.exists():
+        _erro("o acesso ao servidor nao esta ligado nesta instalacao.",
+              "Isso se liga na stack (COPILOTO_HOST_SSH=on) e vale no proximo Update.")
+    r = subprocess.run(
+        ["ssh", "-F", str(SSH_DIR / "config"), "-o", "BatchMode=yes",
+         "-o", "ConnectTimeout=8", "vps", "hostname; uptime -p"],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        _erro("nao consegui entrar no servidor (%s)." % (r.stderr or "sem detalhe").strip().splitlines()[-1:],
+              "Confira se a stack tem o volume /root/.ssh e COPILOTO_HOST_SSH=on.")
+    _ok("acesso ao servidor OK — %s" % " ".join(r.stdout.split()))
+
+
 USO = __doc__
 
 
@@ -329,6 +497,10 @@ def main():
         cmd_status()
     elif v in ("fabrica", "original", "reset"):
         cmd_fabrica(forcado)
+    elif v in ("site", "sites", "pagina"):
+        cmd_site(positivos)
+    elif v in ("servidor", "ssh", "host"):
+        cmd_servidor()
     else:
         print(USO)
         sys.exit(2)

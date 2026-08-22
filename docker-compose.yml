@@ -10,12 +10,24 @@ services:
       - HERMES_GID=1000
       - TZ=America/Sao_Paulo
       - OPENAI_API_KEY=sk-COLE-SUA-CHAVE
+      # Opcional: com uma chave da Anthropic o cerebro vira Claude (paginas e
+      # textos MUITO melhores). Sem ela, segue no gpt-5.
+      - ANTHROPIC_API_KEY=
+      # Dominio publico desta instalacao — o container nao tem como descobrir
+      # sozinho, e sem ele o agente nao sabe o endereco do site que publicou.
+      - COPILOTO_DOMINIO=SEU-DOMINIO
       - DASH_USER=admin
       - DASH_PASS=TroqueEstaSenha2026
       - WHATSAPP_OWNER_NUMBER=5586999990000
       - WHATSAPP_OWNER_NAME=Dr. Fulano
+      # Acesso do agente ao servidor (root por SSH). "off" desliga e a chave
+      # sai do authorized_keys do host no proximo boot.
+      - COPILOTO_HOST_SSH=on
     volumes:
       - /opt/copiloto/data:/opt/data
+      # Da ao agente acesso SSH ao proprio servidor: no boot ele autoriza a
+      # chave dele aqui. Sem este volume, o acesso simplesmente nao existe.
+      - /root/.ssh:/opt/host-ssh
     networks:
       - traefik_public
     deploy:
@@ -25,8 +37,9 @@ services:
       labels:
         - traefik.enable=true
         - traefik.docker.network=traefik_public
-        # Pagina de QR em /whatsapp (prioridade maior que o painel)
-        - "traefik.http.routers.cpqr.rule=Host(`SEU-DOMINIO`) && PathPrefix(`/whatsapp`)"
+        # Pagina de QR em /whatsapp e sites publicados em /s (prioridade maior
+        # que o painel, que e' o catch-all do dominio)
+        - "traefik.http.routers.cpqr.rule=Host(`SEU-DOMINIO`) && (PathPrefix(`/whatsapp`) || PathPrefix(`/s`))"
         - traefik.http.routers.cpqr.entrypoints=websecure
         - traefik.http.routers.cpqr.tls.certresolver=le
         - traefik.http.routers.cpqr.service=cpqr

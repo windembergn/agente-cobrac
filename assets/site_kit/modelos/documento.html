@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>[[TIPO_DE_DOCUMENTO]] — [[NOME_DO_PACIENTE]]</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📄</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;650&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/s/_kit/base.css">
+<style>:root { --brand: [[COR_PRINCIPAL]]; }</style>
+</head>
+<body>
+
+<div class="acoes-doc" style="margin-top:var(--sp-5)">
+  <button class="btn" onclick="window.print()">🖨️ Imprimir / salvar em PDF</button>
+</div>
+
+<article class="documento">
+
+  <header>
+    <p class="rotulo">[[TIPO_DE_DOCUMENTO]]</p>
+    <h1>[[TITULO_DO_DOCUMENTO]]</h1>
+    <p class="small muted">Emitido em [[DATA_POR_EXTENSO]]</p>
+  </header>
+
+  <dl class="dados">
+    <div><dt>Paciente</dt><dd>[[NOME_DO_PACIENTE]]</dd></div>
+    <div><dt>Convênio</dt><dd>[[CONVENIO_E_CARTEIRINHA]]</dd></div>
+    <div><dt>Hipótese diagnóstica</dt><dd>[[DIAGNOSTICO_E_CID]]</dd></div>
+    <div><dt>Procedimento</dt><dd>[[PROCEDIMENTO_E_TUSS]]</dd></div>
+  </dl>
+
+  <section class="prosa" style="padding-block:var(--sp-5)">
+    <h2>[[TITULO_DA_SECAO_1_EX_JUSTIFICATIVA_CLINICA]]</h2>
+    <p>[[TEXTO_CORRIDO_1]]</p>
+
+    <h2>[[TITULO_DA_SECAO_2]]</h2>
+    <p>[[TEXTO_CORRIDO_2]]</p>
+
+    <h2>[[TITULO_DA_SECAO_3]]</h2>
+    <ul>
+      <li>[[ITEM_1]]</li>
+      <li>[[ITEM_2]]</li>
+      <li>[[ITEM_3]]</li>
+    </ul>
+  </section>
+
+  <div class="aviso">
+    <p><strong>Pendências para o cirurgião confirmar:</strong> [[LISTA_DO_QUE_FALTA_OU_A_PALAVRA_NENHUMA]].</p>
+  </div>
+
+  <div class="assinatura">
+    [[NOME_DO_CIRURGIAO]]<br>
+    <span class="muted">CRO [[CRO]]</span>
+  </div>
+
+  <p class="small muted" style="margin-top:var(--sp-6)">Minuta gerada para revisão e assinatura do cirurgião responsável.</p>
+
+</article>
+
+</body>
+</html>

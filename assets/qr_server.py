@@ -13,6 +13,12 @@ mesmo container, cada um com sua sessao, seu bridge e seus grupos.
   DELETE /whatsapp/api/slots/<id>/groups/<jid>   tira o copiloto de um grupo
   GET    /whatsapp/qr.png?slot=<id>      PNG do QR daquele slot
 
+  GET    /s/<nome>/...                   site publicado pelo agente (PUBLICO,
+                                         sem senha) — arquivos de
+                                         $DATA/sites/<nome>/. E' o que faz o
+                                         agente "subir um site" so escrevendo
+                                         arquivo, sem tocar no host.
+
   thread: le $DATA/whatsapp/requests/*.json, escritos pelo bridge quando
   alguem manda /main ou /sair num grupo, e reconcilia a configuracao.
 
@@ -39,10 +45,49 @@ PORT = int(os.environ.get("COPILOTO_QR_PORT", "8099"))
 DASH_USER = os.environ.get("DASH_USER", "admin")
 DASH_PASS = os.environ.get("DASH_PASS", "TroqueASenha2026")
 MAX_SLOTS = int(os.environ.get("COPILOTO_MAX_SLOTS", "8"))
+# Dominio publico da instalacao (vem da stack). O container nao tem como
+# descobrir sozinho o Host das labels do Traefik, entao sem esta env o
+# agente nao sabe montar a URL do site que acabou de publicar.
+DOMINIO = (os.environ.get("COPILOTO_DOMINIO") or os.environ.get("DOMAIN") or "").strip()
 
 _auth_header = "Basic " + base64.b64encode(f"{DASH_USER}:{DASH_PASS}".encode()).decode()
 _lock = threading.Lock()
 _pairers = {}   # slot_id -> Pairer
+
+# --------------------------------------------------------------- sites (/s)
+SITES = os.path.join(S.DATA, "sites")
+_MIME = {
+    ".html": "text/html; charset=utf-8", ".htm": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8", ".txt": "text/plain; charset=utf-8",
+    ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp",
+    ".avif": "image/avif", ".ico": "image/x-icon", ".pdf": "application/pdf",
+    ".mp4": "video/mp4", ".mp3": "audio/mpeg", ".woff2": "font/woff2",
+    ".woff": "font/woff", ".ttf": "font/ttf",
+}
+
+
+def _site_file(url_path):
+    """Resolve /s/<resto> para um arquivo dentro de $DATA/sites, ou None.
+
+    Fecha travessia de caminho (../, link simbolico, caminho absoluto) com
+    realpath: o resultado TEM que continuar dentro de SITES. Esta rota e'
+    publica, entao e' a unica parte do painel que um estranho alcanca.
+    """
+    rel = unquote(url_path[3:]).lstrip("/")          # tira "/s/"
+    base = os.path.realpath(SITES)
+    alvo = os.path.realpath(os.path.join(base, rel))
+    if alvo != base and not alvo.startswith(base + os.sep):
+        return None
+    if os.path.isdir(alvo):
+        alvo = os.path.join(alvo, "index.html")
+    if not os.path.isfile(alvo):
+        return None
+    # arquivo oculto (.git, .env) nunca sai
+    if any(p.startswith(".") for p in os.path.relpath(alvo, base).split(os.sep)):
+        return None
+    return alvo
 
 
 def _log(msg):
@@ -382,7 +427,29 @@ def _state():
             "groups": slot.get("groups") or [],
             "home": slot.get("home"),
         })
-    return {"slots": out, "max": MAX_SLOTS}
+    return {"slots": out, "max": MAX_SLOTS, "sites": _sites(), "dominio": DOMINIO}
+
+
+def _sites():
+    """Sites publicados pelo agente, para aparecerem no painel."""
+    fora = []
+    try:
+        for nome in sorted(os.listdir(SITES)):
+            if nome.startswith(".") or nome == "_kit":
+                continue
+            pasta = os.path.join(SITES, nome)
+            if not os.path.isdir(pasta):
+                continue
+            idx = os.path.join(pasta, "index.html")
+            fora.append({
+                "nome": nome,
+                "ok": os.path.isfile(idx),
+                "url": ("https://%s/s/%s/" % (DOMINIO, nome)) if DOMINIO else "/s/%s/" % nome,
+                "modificado": int(os.path.getmtime(idx)) if os.path.isfile(idx) else 0,
+            })
+    except OSError:
+        pass
+    return fora
 
 
 def _create_slot(body):
@@ -522,6 +589,11 @@ code{background:#0E1B2D;border:1px solid #23374F;border-radius:6px;padding:1px 6
   <div class="hint"><b>Mesmo copiloto:</b> o número é mais uma entrada do seu copiloto — ele lembra de tudo junto.<br>
   <b>Copiloto separado:</b> um assistente independente, com memória e histórico próprios.</div>
 </div>
+<div class="card" id="sitesCard" style="display:none">
+  <div class="glabel">Sites publicados</div>
+  <div id="sites"></div>
+  <div class="hint">Peça no grupo: <i>"faz uma página de pós-operatório de siso pro paciente"</i> — o copiloto escreve e publica sozinho, e te manda o link.</div>
+</div>
 <div class="foot">
 No grupo do WhatsApp: <code>/main</code> ativa o copiloto ali · <code>/sair</code> desativa · <code>/grupos</code> lista os grupos daquele número.
 </div>
@@ -562,6 +634,11 @@ async function tick(){
       const r=await fetch('/whatsapp/api/state',{cache:'no-store'});
       const st=await r.json();
       document.getElementById('slots').innerHTML=st.slots.map(slotCard).join('');
+      const sites=st.sites||[];
+      document.getElementById('sitesCard').style.display=sites.length?'':'none';
+      document.getElementById('sites').innerHTML=sites.map(s=>
+        '<div class="g"><span class="gn">'+esc(s.nome)+(s.ok?'':' <span class="tag off">sem página</span>')+'</span>'+
+        '<a href="'+esc(s.url)+'" target="_blank" rel="noopener" style="color:#4FE0CB;font-size:13px">abrir ↗</a></div>').join('');
     }catch(e){}
   }
   setTimeout(tick,4000);
@@ -602,9 +679,36 @@ tick();
 </script></body></html>"""
 
 
+SITE_404 = """<!doctype html><html lang="pt-BR"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pagina nao encontrada</title>
+<style>
+ body{margin:0;min-height:100vh;display:grid;place-items:center;background:#fbfaf8;color:#14181a;
+      font:400 17px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;text-align:center;padding:2rem}
+ h1{font:600 2rem/1.1 Georgia,serif;margin:0 0 .5rem}
+ p{color:#6b7478;margin:0}
+ @media(prefers-color-scheme:dark){body{background:#0e1113;color:#f2f0ec}p{color:#98a1a6}}
+</style>
+<div><h1>Pagina nao encontrada</h1><p>Confira o endereco ou peca o link de novo.</p></div>
+</html>"""
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
+
+    def do_HEAD(self):
+        # Basta para checagem de rota (curl -I) e para o Traefik/monitor.
+        if self.path == "/s" or self.path.startswith("/s/"):
+            alvo = _site_file(urlparse(self.path).path)
+            self.send_response(200 if alvo else 404)
+            if alvo:
+                ext = os.path.splitext(alvo)[1].lower()
+                self.send_header("Content-Type", _MIME.get(ext, "application/octet-stream"))
+                self.send_header("Content-Length", str(os.path.getsize(alvo)))
+            self.end_headers()
+            return
+        self.send_response(405); self.end_headers()
 
     def _auth_ok(self):
         return self.headers.get("Authorization", "") == _auth_header
@@ -637,8 +741,39 @@ class H(BaseHTTPRequestHandler):
             self._deny(); return False
         return True
 
+    # ------------------------------------------------------ GET publico (/s)
+    def _servir_site(self):
+        """Rota publica: entrega o site que o agente escreveu no volume."""
+        alvo = _site_file(urlparse(self.path).path)
+        if not alvo:
+            body = SITE_404.encode()
+            self.send_response(404)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        ext = os.path.splitext(alvo)[1].lower()
+        try:
+            with open(alvo, "rb") as f:
+                dados = f.read()
+        except OSError:
+            self.send_response(500); self.end_headers(); return
+        self.send_response(200)
+        self.send_header("Content-Type", _MIME.get(ext, "application/octet-stream"))
+        # HTML sempre fresco (o agente reescreve e o cirurgiao da F5);
+        # imagem/css/fonte podem ficar em cache curto.
+        self.send_header("Cache-Control",
+                         "no-cache" if ext in (".html", ".htm") else "public, max-age=300")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Length", str(len(dados)))
+        self.end_headers()
+        self.wfile.write(dados)
+
     # ------------------------------------------------------------- GET
     def do_GET(self):
+        if self.path == "/s" or self.path.startswith("/s/"):
+            return self._servir_site()
         if not self._guard():
             return
         u = urlparse(self.path)
