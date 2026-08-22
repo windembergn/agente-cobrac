@@ -25,12 +25,14 @@ import urllib.request
 TIMEOUT = 12
 PLACEHOLDERS = ("cole", "sua-chave", "sk-cole", "xxx", "troque", "placeholder")
 
-# Familia preferida por padrao, decidida pelo TIPO da credencial:
-#   - token do plano (sk-ant-oat*, o do `claude setup-token`): Opus, porque o
-#     consumo ja esta pago na assinatura;
-#   - chave de API avulsa (sk-ant-api*): Sonnet, melhor custo/qualidade para um
-#     agente que fica ligado o dia inteiro.
-# COPILOTO_FAMILIA=opus|sonnet manda mais que isso.
+# Familia preferida: SONNET, sempre, e de proposito.
+#
+# Opus e' melhor por resposta, mas o Copiloto fica ligado o dia inteiro
+# processando audio, imagem e documento — no token do plano ele torraria a cota
+# de Opus em poucas horas e o cirurgiao ficaria sem copiloto no meio do dia; na
+# chave avulsa, a conta sobe na mesma proporcao. Com o kit de design fazendo o
+# acabamento das paginas, a diferenca pratica e' pequena.
+# Quem quiser o topo: COPILOTO_FAMILIA=opus na stack.
 FALLBACK_ANTHROPIC = "claude-sonnet-4-5-20250929"
 FALLBACK_OPENAI = "gpt-5"
 
@@ -70,9 +72,7 @@ def eh_token_do_plano(chave):
 
 def familia_preferida(chave):
     escolhida = limpa_texto(os.environ.get("COPILOTO_FAMILIA"))
-    if escolhida:
-        return escolhida.lower()
-    return "opus" if eh_token_do_plano(chave) else "sonnet"
+    return escolhida.lower() if escolhida else "sonnet"
 
 
 def lista_modelos(chave):
@@ -118,7 +118,7 @@ def escolhe_claude(chave):
         return (FALLBACK_ANTHROPIC,
                 "COPILOTO_MODELO='%s' nao existe nesta conta; usando o padrao" % forcado)
 
-    for familia in (familia_preferida(chave), "opus", "sonnet"):
+    for familia in (familia_preferida(chave), "sonnet", "opus"):
         candidatos = [i for i in ids if ("claude-%s" % familia) in i]
         if candidatos:
             melhor = sorted(candidatos, key=peso, reverse=True)[0]

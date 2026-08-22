@@ -12,7 +12,13 @@ services:
       - OPENAI_API_KEY=sk-COLE-SUA-CHAVE
       # Opcional: com uma chave da Anthropic o cerebro vira Claude (paginas e
       # textos MUITO melhores). Sem ela, segue no gpt-5.
+      # Serve tanto a chave de API (sk-ant-api...) quanto o token do plano
+      # (sk-ant-oat..., gerado por `claude setup-token`).
       - ANTHROPIC_API_KEY=
+      # Padrao e Sonnet. COPILOTO_FAMILIA=opus troca para o topo — melhor por
+      # resposta, mas queima a cota/conta bem mais rapido num agente que fica
+      # ligado o dia inteiro.
+      # - COPILOTO_FAMILIA=opus
       # Dominio publico desta instalacao — o container nao tem como descobrir
       # sozinho, e sem ele o agente nao sabe o endereco do site que publicou.
       - COPILOTO_DOMINIO=SEU-DOMINIO
