@@ -409,6 +409,9 @@ def cmd_site_conferir(nome):
             if not (pagina.parent / a.split("?")[0].split("#")[0]).exists():
                 problemas.append("%s: arquivo referenciado nao existe -> %s" % (rel, a))
 
+        if "/s/_kit/kit.js" not in html and 'class="documento"' not in html:
+            avisos.append("%s: sem o kit.js — a pagina perde as animacoes de secao, o carrossel "
+                          "e o FAQ. Falta <script src=\"/s/_kit/kit.js\" defer></script>" % rel)
         if "/s/_kit/base.css" not in html:
             problemas.append("%s: nao carrega o kit de design (a pagina vai sair feia). "
                              "Faltou <link rel=\"stylesheet\" href=\"/s/_kit/base.css\">" % rel)

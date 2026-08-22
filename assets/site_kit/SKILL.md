@@ -83,9 +83,54 @@ o texto do botão, a cor?"). Nada de caminho de arquivo nem nome de comando pro 
   `cta`, `passos`, `faq`, `checklist`, `aviso`, `documento`, `dados`, `galeria`, `numero`,
   `hero-figura`, `retrato`, `figura-vazia`, `zap-flutuante`, `tabela-rolavel`, `centro`, `muted`,
   `small`. A lista completa está comentada em `/opt/data/sites/_kit/base.css`.
-- **Cor:** escolha **uma** cor de marca coerente com o consultório e escreva no `--brand`. Verde
-  clínico `#0b5c4e`, azul `#12456b`, grafite `#26303a`, bordô `#7a2231`. Uma só. Nunca deixe
-  `[[COR_PRINCIPAL]]`.
+- **Cor:** o padrão é o **azul clínico `#0e5aa7`** — deixe assim, a não ser que o cirurgião peça
+  outra ou mande um logo com cor própria. Se pedir, use **uma** cor só no `--brand` (azul-marinho
+  `#123a6b`, verde clínico `#0b5c4e`, grafite `#26303a`, bordô `#7a2231`). Nunca deixe
+  `[[COR_PRINCIPAL]]` no arquivo.
+
+## Como a página tem que parecer (quando ele não pedir nada)
+
+O padrão é **site de consultório**: branco, azul, limpo, moderno e com movimento discreto — o que
+o paciente espera ver de um cirurgião. Você não escolhe estilo a cada pedido; **este é o estilo**.
+Só mude se ele pedir.
+
+O que já vem pronto e você só precisa **não estragar**:
+
+- **Animação de entrada por seção.** Ponha `class="revelar"` no bloco de cada seção (e
+  `revelar-d1`, `revelar-d2`, `revelar-d3` nos cartões seguintes, para entrarem em cascata). Quem
+  configurou o celular para menos movimento não vê animação nenhuma — isso é automático.
+- **Botão que pulsa:** `class="btn btn-zap btn-grande btn-pulso"` no botão principal de WhatsApp.
+  Verde de WhatsApp no CTA, azul no resto.
+- **Barra fixa embaixo no celular** (`.barra-fixa`) e bolha no desktop (`.zap-flutuante`): já vêm
+  no modelo, deixe as duas.
+- **Contadores que sobem sozinhos:** `<p class="numero" data-contar="3000" data-prefixo="+">0</p>`.
+  Só com número que o cirurgião passou.
+- **FAQ em acordeão**, um aberto por vez, com abertura animada.
+- **Carrossel** que rola com o dedo e ganha setas sozinho: `.carrossel-caixa > .carrossel > itens`.
+- **Palavra destacada no título:** `<h1>Cirurgia de siso em <span class="destaque">Joinville</span></h1>`.
+- **Nada de `<script>` seu.** O comportamento inteiro vem de `/s/_kit/kit.js`, que os modelos já
+  carregam. Se a página precisar de algo que o kit não faz, ela não precisa.
+
+**No celular** (é onde o paciente abre): a foto vem primeiro e sangra na largura toda, o botão
+principal ocupa a linha inteira, e a barra fixa fica sempre à mão. Isso já está no CSS — para
+funcionar, basta usar a estrutura do modelo e **não inventar layout**.
+
+## Ilustrações que já estão na máquina
+
+Você tem um conjunto de ícones de procedimento, em traço, já na cor da marca:
+
+`dente` · `siso` · `implante` · `atm` · `ortognatica` · `enxerto` · `patologia` · `radiografia`
+· `anestesia` · `agenda` · `convenio` · `sorriso` · `acompanhamento` · `recuperacao`
+
+Uso dentro de um cartão:
+
+```html
+<div class="icone"><i class="icone-svg i-siso"></i></div>
+```
+
+Eles **acompanham a cor da marca** automaticamente. Para uma faixa com fundo discreto, use
+`class="fundo-suave"` na seção. Não existe banco de fotos aqui: **foto só a que o cirurgião
+mandar**.
 - **Emoji só nos `icone`/botões** do modelo. Não espalhe pelo texto.
 - **Só o título é curto.** A frase do hero tem até ~10 palavras. O resto da página, não: veja a
   seção de conteúdo abaixo.
@@ -143,6 +188,19 @@ parecerem leves em vez de um paredão.
   ```
 - **Nunca** use foto da internet, banco de imagem, link de outro site, nem invente `src`. Imagem
   quebrada estraga a página inteira.
+
+**Quando ele mandar várias fotos, use todas — no lugar certo:**
+
+| O que ele mandou | Onde entra |
+|---|---|
+| Foto dele (retrato, jaleco) | topo da página e seção "quem cuida de você" (`.foto-legenda`) |
+| Logo do consultório | no topo, dentro de `.marca`: `<a class="marca"><img src="logo.png" alt="..."></a>` e também na `.barra-fixa` |
+| 3 ou mais fotos do mesmo assunto | **carrossel** (`.carrossel-caixa`), nunca empilhadas uma embaixo da outra |
+| Par antes/depois | bloco `.antes-depois` dentro do carrossel |
+| Foto do consultório / fachada | seção "onde atendo", ao lado do mapa |
+
+Renomeie ao copiar (`foto-dr.jpg`, `logo.png`, `antes-1.jpg`) — nome de arquivo do WhatsApp
+(`img_a3f9c2.jpg`) não diz nada para quem for mexer depois.
 
 ## Nunca invente
 

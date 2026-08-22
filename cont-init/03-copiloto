@@ -191,9 +191,11 @@ fi
 # principio de "ferramenta instalada sem instrucao = agente que diz nao consigo".
 # ---------------------------------------------------------------------------
 if [ -d /opt/copiloto/site_kit ]; then
-  mkdir -p "$DATA/sites/_kit/modelos" "$DATA/skills/publicar-site"
+  mkdir -p "$DATA/sites/_kit/modelos" "$DATA/sites/_kit/img" "$DATA/skills/publicar-site"
   cp /opt/copiloto/site_kit/base.css "$DATA/sites/_kit/base.css" 2>/dev/null || true
+  cp /opt/copiloto/site_kit/kit.js "$DATA/sites/_kit/kit.js" 2>/dev/null || true
   cp /opt/copiloto/site_kit/modelos/*.html "$DATA/sites/_kit/modelos/" 2>/dev/null || true
+  cp /opt/copiloto/site_kit/img/* "$DATA/sites/_kit/img/" 2>/dev/null || true
   cp /opt/copiloto/site_kit/SKILL.md "$DATA/skills/publicar-site/SKILL.md" 2>/dev/null || true
 fi
 

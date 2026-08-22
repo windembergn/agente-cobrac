@@ -1,9 +1,11 @@
 <!doctype html>
 <!--
-  MODELO DE LANDING — este esqueleto e' o PISO, nao o teto.
-  Cada [[MARCADOR]] de paragrafo espera 3 a 6 linhas com motivo, prazo e exemplo,
-  nao uma frase. Duplique blocos e crie secoes novas quando o assunto pedir.
-  Alvo: 900 a 1500 palavras de texto visivel.
+  MODELO DE PAGINA DE CAPTACAO — o padrao "site de consultorio".
+  Estrutura medida em site real de cirurgia bucomaxilofacial: foto no topo,
+  tratamentos, sintomas, convenios, antes/depois, quem e' o doutor, avaliacoes,
+  duvidas, contato. Este esqueleto e' o PISO: cada [[MARCADOR]] de paragrafo
+  espera 3 a 6 linhas, e secao que nao fizer sentido pro caso deve ser APAGADA
+  inteira (nunca deixada com marcador). Alvo: 900 a 1500 palavras.
 -->
 <html lang="pt-BR">
 <head>
@@ -19,6 +21,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;650&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/s/_kit/base.css">
+<script src="/s/_kit/kit.js" defer></script>
 <style>:root { --brand: [[COR_PRINCIPAL]]; }</style>
 </head>
 <body>
@@ -27,156 +30,155 @@
   <div class="container">
     <a class="marca" href="#">[[NOME_CURTO]]<span>.</span></a>
     <nav>
-      <a href="#tratamento">O tratamento</a>
-      <a href="#como">Como funciona</a>
+      <a href="#tratamentos">Tratamentos</a>
       <a href="#sobre">Quem cuida de você</a>
+      <a href="#avaliacoes">Avaliações</a>
       <a href="#duvidas">Dúvidas</a>
-      <a class="btn" href="[[LINK_WHATSAPP]]">Falar no WhatsApp</a>
+      <a class="btn btn-zap" href="[[LINK_WHATSAPP]]">Agendar consulta</a>
     </nav>
   </div>
 </header>
 
 <main>
 
+  <!-- HERO: no celular a foto vem primeiro, sangrando na largura toda -->
   <section class="hero">
     <div class="container duas-colunas">
-      <div>
+      <div class="pilha revelar">
         <span class="selo">[[SELO_CURTO]]</span>
-        <h1>[[TITULO_PRINCIPAL_ATE_10_PALAVRAS]]</h1>
+        <h1>[[TITULO_ATE_10_PALAVRAS_COM]] <span class="destaque">[[PALAVRA_DESTACADA]]</span></h1>
         <p class="lede">[[SUBTITULO_2_A_3_LINHAS_DIZENDO_O_QUE_O_PACIENTE_GANHA]]</p>
         <div class="linha">
-          <a class="btn btn-grande" href="[[LINK_WHATSAPP]]">[[TEXTO_DO_BOTAO]]</a>
-          <a class="btn btn-vazado btn-grande" href="#como">Entender o processo</a>
+          <a class="btn btn-zap btn-grande btn-pulso" href="[[LINK_WHATSAPP]]">💬 [[TEXTO_DO_BOTAO]]</a>
         </div>
-        <p class="small muted" style="margin-top:var(--sp-4)">[[LINHA_DE_CONFIANCA_CRO_E_EXPERIENCIA]]</p>
+        <span class="selo-confianca">★ [[SELO_DE_CONFIANCA_EX_100_AVALIACOES_POSITIVAS]]</span>
+        <p class="small muted">[[LINHA_DE_CREDENCIAL_CRO_E_EXPERIENCIA]]</p>
       </div>
-      <img class="hero-figura" src="[[IMAGEM_PRINCIPAL]]" alt="[[DESCRICAO_DA_IMAGEM]]">
+      <img class="hero-retrato revelar revelar-d1" src="[[FOTO_DO_CIRURGIAO]]" alt="[[NOME_COMPLETO]]">
     </div>
   </section>
 
+  <!-- NUMEROS: contam sozinhos quando entram na tela -->
   <section class="faixa compacta">
     <div class="container grade grade-4 centro">
-      <div><p class="numero">[[NUMERO_1]]</p><p>[[LEGENDA_1]]</p></div>
-      <div><p class="numero">[[NUMERO_2]]</p><p>[[LEGENDA_2]]</p></div>
-      <div><p class="numero">[[NUMERO_3]]</p><p>[[LEGENDA_3]]</p></div>
-      <div><p class="numero">[[NUMERO_4]]</p><p>[[LEGENDA_4]]</p></div>
+      <div class="revelar"><p class="numero" data-contar="[[NUMERO_1]]" data-prefixo="+">0</p><p>[[LEGENDA_1]]</p></div>
+      <div class="revelar revelar-d1"><p class="numero" data-contar="[[NUMERO_2]]" data-prefixo="+">0</p><p>[[LEGENDA_2]]</p></div>
+      <div class="revelar revelar-d2"><p class="numero" data-contar="[[NUMERO_3]]" data-prefixo="+">0</p><p>[[LEGENDA_3]]</p></div>
+      <div class="revelar revelar-d3"><p class="numero" data-contar="[[NUMERO_4]]" data-prefixo="+">0</p><p>[[LEGENDA_4]]</p></div>
     </div>
   </section>
 
-  <!-- O PROBLEMA — fale da vida do paciente, nao do procedimento -->
-  <section>
+  <!-- TRATAMENTOS: use os icones do kit (classe i-<nome>) -->
+  <section id="tratamentos">
     <div class="container pilha-larga">
-      <div class="centro">
-        <p class="rotulo">[[ROTULO_DA_SECAO]]</p>
-        <h2>[[TITULO_DA_SECAO_DE_PROBLEMAS]]</h2>
+      <div class="centro revelar">
+        <p class="rotulo">Tratamentos</p>
+        <h2>[[TITULO_DA_SECAO_DE_TRATAMENTOS]]</h2>
         <p class="lede">[[PARAGRAFO_DE_ABERTURA_3_A_5_LINHAS]]</p>
       </div>
       <div class="grade grade-3">
-        <article class="cartao">
-          <div class="icone">[[EMOJI_1]]</div>
-          <h3>[[PROBLEMA_1]]</h3>
-          <p>[[EXPLICACAO_3_A_5_LINHAS_1]]</p>
+        <article class="cartao centro revelar">
+          <div class="icone"><i class="icone-svg i-siso"></i></div>
+          <h3>[[TRATAMENTO_1]]</h3><hr class="divisor">
+          <p>[[EXPLICACAO_4_A_6_LINHAS_1]]</p>
         </article>
-        <article class="cartao">
-          <div class="icone">[[EMOJI_2]]</div>
-          <h3>[[PROBLEMA_2]]</h3>
-          <p>[[EXPLICACAO_3_A_5_LINHAS_2]]</p>
+        <article class="cartao centro revelar revelar-d1">
+          <div class="icone"><i class="icone-svg i-implante"></i></div>
+          <h3>[[TRATAMENTO_2]]</h3><hr class="divisor">
+          <p>[[EXPLICACAO_4_A_6_LINHAS_2]]</p>
         </article>
-        <article class="cartao">
-          <div class="icone">[[EMOJI_3]]</div>
-          <h3>[[PROBLEMA_3]]</h3>
-          <p>[[EXPLICACAO_3_A_5_LINHAS_3]]</p>
+        <article class="cartao centro revelar revelar-d2">
+          <div class="icone"><i class="icone-svg i-atm"></i></div>
+          <h3>[[TRATAMENTO_3]]</h3><hr class="divisor">
+          <p>[[EXPLICACAO_4_A_6_LINHAS_3]]</p>
+        </article>
+        <article class="cartao centro revelar">
+          <div class="icone"><i class="icone-svg i-ortognatica"></i></div>
+          <h3>[[TRATAMENTO_4]]</h3><hr class="divisor">
+          <p>[[EXPLICACAO_4_A_6_LINHAS_4]]</p>
+        </article>
+        <article class="cartao centro revelar revelar-d1">
+          <div class="icone"><i class="icone-svg i-enxerto"></i></div>
+          <h3>[[TRATAMENTO_5]]</h3><hr class="divisor">
+          <p>[[EXPLICACAO_4_A_6_LINHAS_5]]</p>
+        </article>
+        <article class="cartao centro revelar revelar-d2">
+          <div class="icone"><i class="icone-svg i-patologia"></i></div>
+          <h3>[[TRATAMENTO_6]]</h3><hr class="divisor">
+          <p>[[EXPLICACAO_4_A_6_LINHAS_6]]</p>
         </article>
       </div>
     </div>
   </section>
 
-  <!-- O TRATAMENTO EXPLICADO — o que e', quando e' indicado, como e' feito -->
-  <section id="tratamento" class="faixa">
-    <div class="container duas-colunas">
-      <div class="pilha">
-        <p class="rotulo">O tratamento</p>
-        <h2>[[TITULO_EXPLICANDO_O_TRATAMENTO]]</h2>
-        <p>[[O_QUE_E_4_A_6_LINHAS]]</p>
-        <p>[[QUANDO_E_INDICADO_E_QUANDO_NAO_E_4_A_6_LINHAS]]</p>
-      </div>
-      <div class="cartao">
-        <h3>Indicado para quem</h3>
-        <ul class="checklist">
-          <li>[[INDICACAO_1]]</li>
-          <li>[[INDICACAO_2]]</li>
-          <li>[[INDICACAO_3]]</li>
-          <li>[[INDICACAO_4]]</li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <!-- COMO FUNCIONA — cada passo com o que acontece e quanto tempo leva -->
-  <section id="como">
+  <!-- SINTOMAS: "voce sente algum destes?" — cartoes pequenos, um deles cheio -->
+  <section class="fundo-suave">
     <div class="container pilha-larga">
-      <div class="centro">
-        <p class="rotulo">Como funciona</p>
-        <h2>[[TITULO_DO_PASSO_A_PASSO]]</h2>
-        <p class="lede">[[FRASE_DE_ABERTURA_DO_PROCESSO]]</p>
+      <div class="centro revelar">
+        <h2>[[PERGUNTA_DOS_SINTOMAS_EX_VOCE_SENTE_ALGUM_DESSES_SINTOMAS]]</h2>
+        <p class="lede">[[PARAGRAFO_LIGANDO_SINTOMA_A_TRATAMENTO]]</p>
       </div>
-      <ol class="passos estreito">
-        <li><div><h3>[[PASSO_1]]</h3><p>[[DETALHE_3_A_5_LINHAS_1]]</p></div></li>
-        <li><div><h3>[[PASSO_2]]</h3><p>[[DETALHE_3_A_5_LINHAS_2]]</p></div></li>
-        <li><div><h3>[[PASSO_3]]</h3><p>[[DETALHE_3_A_5_LINHAS_3]]</p></div></li>
-        <li><div><h3>[[PASSO_4]]</h3><p>[[DETALHE_3_A_5_LINHAS_4]]</p></div></li>
-      </ol>
+      <div class="grade grade-4">
+        <article class="cartao centro revelar"><div class="icone"><i class="icone-svg i-dente"></i></div><h3>[[SINTOMA_1]]</h3><p>[[DETALHE_1]]</p></article>
+        <article class="cartao centro cartao-marca revelar revelar-d1"><div class="icone"><i class="icone-svg i-atm"></i></div><h3>[[SINTOMA_2]]</h3><p>[[DETALHE_2]]</p></article>
+        <article class="cartao centro revelar revelar-d2"><div class="icone"><i class="icone-svg i-recuperacao"></i></div><h3>[[SINTOMA_3]]</h3><p>[[DETALHE_3]]</p></article>
+        <article class="cartao centro revelar revelar-d3"><div class="icone"><i class="icone-svg i-radiografia"></i></div><h3>[[SINTOMA_4]]</h3><p>[[DETALHE_4]]</p></article>
+      </div>
+      <div class="centro"><a class="btn btn-zap btn-grande btn-pulso" href="[[LINK_WHATSAPP]]">💬 [[TEXTO_DO_BOTAO]]</a></div>
     </div>
   </section>
 
-  <!-- RECUPERACAO / O QUE ESPERAR — some a secao se nao fizer sentido -->
+  <!-- CONVENIOS: se o cirurgiao nao informou nenhum, APAGUE esta secao -->
+  <section class="compacta">
+    <div class="container pilha revelar">
+      <p class="rotulo centro">Convênios atendidos</p>
+      <div class="logos">
+        <span>[[CONVENIO_1]]</span><span>[[CONVENIO_2]]</span><span>[[CONVENIO_3]]</span><span>[[CONVENIO_4]]</span>
+      </div>
+      <p class="small muted centro">[[LINHA_SOBRE_REEMBOLSO_OU_PARTICULAR]]</p>
+    </div>
+  </section>
+
+  <!-- ANTES E DEPOIS / GALERIA: so' com fotos que o cirurgiao mandou.
+       Sem fotos, APAGUE a secao — nunca invente imagem. -->
   <section class="faixa">
     <div class="container pilha-larga">
-      <div class="centro">
-        <p class="rotulo">Depois do procedimento</p>
-        <h2>[[TITULO_DA_RECUPERACAO]]</h2>
+      <div class="centro revelar">
+        <p class="rotulo">Resultados</p>
+        <h2>[[TITULO_DA_GALERIA]]</h2>
+        <p class="lede">[[PARAGRAFO_SOBRE_OS_RESULTADOS]]</p>
       </div>
-      <div class="tabela-rolavel">
-        <table>
-          <thead><tr><th>Quando</th><th>O que é esperado</th><th>O que você já pode fazer</th></tr></thead>
-          <tbody>
-            <tr><td>[[PERIODO_1]]</td><td>[[ESPERADO_1]]</td><td>[[PODE_1]]</td></tr>
-            <tr><td>[[PERIODO_2]]</td><td>[[ESPERADO_2]]</td><td>[[PODE_2]]</td></tr>
-            <tr><td>[[PERIODO_3]]</td><td>[[ESPERADO_3]]</td><td>[[PODE_3]]</td></tr>
-          </tbody>
-        </table>
+      <div class="carrossel-caixa revelar">
+        <div class="carrossel largo">
+          <div class="antes-depois">
+            <figure><img src="[[FOTO_ANTES_1]]" alt="Antes"><figcaption>Antes</figcaption></figure>
+            <figure><img src="[[FOTO_DEPOIS_1]]" alt="Depois"><figcaption>Depois</figcaption></figure>
+          </div>
+          <div class="antes-depois">
+            <figure><img src="[[FOTO_ANTES_2]]" alt="Antes"><figcaption>Antes</figcaption></figure>
+            <figure><img src="[[FOTO_DEPOIS_2]]" alt="Depois"><figcaption>Depois</figcaption></figure>
+          </div>
+        </div>
       </div>
-      <div class="aviso estreito">
-        <p><strong>Quando ligar para o consultório:</strong> [[SINAIS_DE_ALERTA]].</p>
-      </div>
+      <p class="small muted centro">Imagens reais de pacientes, publicadas com autorização.</p>
     </div>
   </section>
 
-  <!-- O QUE ESTA INCLUSO -->
-  <section>
+  <!-- QUEM CUIDA DE VOCE -->
+  <section id="sobre">
     <div class="container duas-colunas">
-      <div class="pilha">
-        <p class="rotulo">O que está incluso</p>
-        <h2>[[TITULO_DO_QUE_ESTA_INCLUSO]]</h2>
-        <p>[[PARAGRAFO_EXPLICANDO_O_ACOMPANHAMENTO]]</p>
-      </div>
-      <ul class="checklist">
-        <li>[[INCLUSO_1]]</li>
-        <li>[[INCLUSO_2]]</li>
-        <li>[[INCLUSO_3]]</li>
-        <li>[[INCLUSO_4]]</li>
-        <li>[[INCLUSO_5]]</li>
-      </ul>
-    </div>
-  </section>
-
-  <section id="sobre" class="faixa">
-    <div class="container duas-colunas">
-      <img class="retrato" src="[[FOTO_DO_CIRURGIAO]]" alt="[[NOME_COMPLETO]]">
-      <div class="pilha">
+      <figure class="foto-legenda revelar">
+        <img src="[[FOTO_DO_CIRURGIAO]]" alt="[[NOME_COMPLETO]]">
+        <figcaption>
+          <div class="nome">[[NOME_COMPLETO]]</div>
+          <div class="cargo">[[ESPECIALIDADE]] · CRO [[CRO]]</div>
+        </figcaption>
+      </figure>
+      <div class="pilha revelar revelar-d1">
         <p class="rotulo">Quem cuida de você</p>
-        <h2>[[NOME_COMPLETO]]</h2>
+        <h2>[[TITULO_SOBRE_O_CIRURGIAO]]</h2>
         <p>[[APRESENTACAO_4_A_6_LINHAS]]</p>
+        <p>[[SEGUNDO_PARAGRAFO_SOBRE_FORMACAO_OU_JEITO_DE_ATENDER]]</p>
         <ul class="checklist">
           <li>[[CREDENCIAL_1]]</li>
           <li>[[CREDENCIAL_2]]</li>
@@ -186,20 +188,55 @@
     </div>
   </section>
 
-  <!-- DEPOIMENTOS — APAGUE a secao inteira se o cirurgiao nao passou nenhum -->
-  <section>
+  <!-- AVALIACOES: use SO depoimentos reais que ele passou. Sem eles, APAGUE. -->
+  <section id="avaliacoes" class="faixa">
     <div class="container pilha-larga">
-      <div class="centro"><h2>[[TITULO_DOS_DEPOIMENTOS]]</h2></div>
-      <div class="grade grade-2">
-        <blockquote>[[DEPOIMENTO_1]]<footer>[[AUTOR_1]]</footer></blockquote>
-        <blockquote>[[DEPOIMENTO_2]]<footer>[[AUTOR_2]]</footer></blockquote>
+      <div class="centro revelar">
+        <p class="rotulo">Avaliações</p>
+        <h2>[[TITULO_DOS_DEPOIMENTOS]]</h2>
+        <span class="nota-google"><span class="estrelas">★★★★★</span> <b>[[NOTA]]</b> · [[QUANTIDADE]] avaliações no Google</span>
+      </div>
+      <div class="carrossel-caixa revelar">
+        <div class="carrossel">
+          <article class="avaliacao">
+            <span class="estrelas">★★★★★</span>
+            <p>[[DEPOIMENTO_1]]</p>
+            <div class="quem"><span class="inicial">[[INICIAL_1]]</span><span><span class="nome">[[AUTOR_1]]</span><br><span class="quando">[[QUANDO_1]]</span></span></div>
+          </article>
+          <article class="avaliacao">
+            <span class="estrelas">★★★★★</span>
+            <p>[[DEPOIMENTO_2]]</p>
+            <div class="quem"><span class="inicial">[[INICIAL_2]]</span><span><span class="nome">[[AUTOR_2]]</span><br><span class="quando">[[QUANDO_2]]</span></span></div>
+          </article>
+          <article class="avaliacao">
+            <span class="estrelas">★★★★★</span>
+            <p>[[DEPOIMENTO_3]]</p>
+            <div class="quem"><span class="inicial">[[INICIAL_3]]</span><span><span class="nome">[[AUTOR_3]]</span><br><span class="quando">[[QUANDO_3]]</span></span></div>
+          </article>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- DUVIDAS — 6 a 12 perguntas, resposta de 3 a 6 linhas cada -->
+  <!-- COMO FUNCIONA -->
+  <section>
+    <div class="container pilha-larga">
+      <div class="centro revelar">
+        <p class="rotulo">Como funciona</p>
+        <h2>[[TITULO_DO_PASSO_A_PASSO]]</h2>
+      </div>
+      <ol class="passos estreito revelar">
+        <li><div><h3>[[PASSO_1]]</h3><p>[[DETALHE_3_A_5_LINHAS_1]]</p></div></li>
+        <li><div><h3>[[PASSO_2]]</h3><p>[[DETALHE_3_A_5_LINHAS_2]]</p></div></li>
+        <li><div><h3>[[PASSO_3]]</h3><p>[[DETALHE_3_A_5_LINHAS_3]]</p></div></li>
+        <li><div><h3>[[PASSO_4]]</h3><p>[[DETALHE_3_A_5_LINHAS_4]]</p></div></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- DUVIDAS: 6 a 12 perguntas, resposta de 3 a 6 linhas -->
   <section id="duvidas" class="faixa">
-    <div class="container estreito pilha">
+    <div class="container estreito pilha revelar">
       <div class="centro"><h2>Perguntas frequentes</h2></div>
       <details class="faq"><summary>[[PERGUNTA_1]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_1]]</p></details>
       <details class="faq"><summary>[[PERGUNTA_2]]</summary><p>[[RESPOSTA_3_A_6_LINHAS_2]]</p></details>
@@ -212,9 +249,32 @@
     </div>
   </section>
 
+  <!-- ONDE ATENDE -->
+  <section id="contato">
+    <div class="container duas-colunas">
+      <div class="pilha revelar">
+        <p class="rotulo">Onde atendo</p>
+        <h2>[[TITULO_DO_CONTATO]]</h2>
+        <dl class="dados">
+          <div><dt>Endereço</dt><dd>[[ENDERECO_COMPLETO]]</dd></div>
+          <div><dt>Horário</dt><dd>[[HORARIO_DE_ATENDIMENTO]]</dd></div>
+          <div><dt>Telefone</dt><dd><a href="tel:[[TELEFONE_SO_NUMEROS]]">[[TELEFONE]]</a></dd></div>
+        </dl>
+        <a class="btn btn-zap btn-grande btn-pulso" href="[[LINK_WHATSAPP]]">💬 [[TEXTO_DO_BOTAO]]</a>
+        <div class="redes">
+          <a href="[[LINK_INSTAGRAM]]" aria-label="Instagram">◎</a>
+          <a href="[[LINK_WHATSAPP]]" aria-label="WhatsApp">✆</a>
+        </div>
+      </div>
+      <div class="mapa revelar revelar-d1">
+        <iframe src="https://www.google.com/maps?q=[[ENDERECO_PARA_URL]]&output=embed" loading="lazy" title="Mapa do consultório" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>
+    </div>
+  </section>
+
   <section>
     <div class="container">
-      <div class="cta">
+      <div class="cta revelar">
         <h2>[[CHAMADA_FINAL]]</h2>
         <p>[[FRASE_DE_APOIO_DA_CHAMADA]]</p>
         <a class="btn btn-claro btn-grande" href="[[LINK_WHATSAPP]]">[[TEXTO_DO_BOTAO]]</a>
@@ -232,6 +292,10 @@
   </div>
 </footer>
 
+<!-- Celular: barra fixa embaixo. Desktop: bolha do zap no canto. -->
+<div class="barra-fixa">
+  <a class="btn btn-zap" href="[[LINK_WHATSAPP]]">💬 [[TEXTO_DO_BOTAO]]</a>
+</div>
 <a class="zap-flutuante" href="[[LINK_WHATSAPP]]">💬 Falar agora</a>
 
 </body>

@@ -9,20 +9,24 @@
 :root {
   color-scheme: light dark;
 
-  /* Cor — trocar so --brand/--brand-ink personaliza a pagina inteira */
-  --brand:       #0b5c4e;
+  /* PADRAO: consultorio — branco e azul, clean, moderno.
+     Trocar so --brand/--brand-soft personaliza a pagina inteira. */
+  --brand:       #0e5aa7;
+  --brand-forte: #0a4380;
   --brand-ink:   #ffffff;
-  --brand-soft:  #e6f2ef;
-  --accent:      #b8863b;
+  --brand-soft:  #e8f1fb;
+  --accent:      #16a37f;
+  --zap:         #25d366;
+  --estrela:     #f5a623;
 
-  --bg:          #fbfaf8;
+  --bg:          #ffffff;
   --surface:     #ffffff;
-  --surface-2:   #f4f2ee;
-  --ink:         #14181a;
-  --ink-soft:    #3d4548;
-  --ink-muted:   #6b7478;
-  --line:        #e3e0da;
-  --line-strong: #cdc9c1;
+  --surface-2:   #f4f8fd;
+  --ink:         #10202f;
+  --ink-soft:    #3a4a5a;
+  --ink-muted:   #6b7c8c;
+  --line:        #e3ebf3;
+  --line-strong: #c9d6e3;
 
   /* Tipografia fluida (clamp) — nunca definir font-size na mao */
   --font-display: "Fraunces", "Iowan Old Style", Georgia, "Times New Roman", serif;
@@ -58,30 +62,30 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-tema="claro"]) {
-    --brand-soft:  #102b26;
-    --bg:          #0e1113;
-    --surface:     #161a1d;
-    --surface-2:   #1d2225;
-    --ink:         #f2f0ec;
-    --ink-soft:    #cbd2d5;
-    --ink-muted:   #98a1a6;
-    --line:        #2a3033;
-    --line-strong: #3a4145;
+    --brand-soft:  #0f2438;
+    --bg:          #0c1219;
+    --surface:     #121b24;
+    --surface-2:   #17222d;
+    --ink:         #eef4f9;
+    --ink-soft:    #c4d1dd;
+    --ink-muted:   #92a3b3;
+    --line:        #22303c;
+    --line-strong: #334453;
     --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
     --shadow-md: 0 4px 12px rgba(0,0,0,.45), 0 12px 32px rgba(0,0,0,.35);
     --shadow-lg: 0 8px 24px rgba(0,0,0,.5), 0 32px 64px rgba(0,0,0,.45);
   }
 }
 :root[data-tema="escuro"] {
-  --brand-soft:  #102b26;
-  --bg:          #0e1113;
-  --surface:     #161a1d;
-  --surface-2:   #1d2225;
-  --ink:         #f2f0ec;
-  --ink-soft:    #cbd2d5;
-  --ink-muted:   #98a1a6;
-  --line:        #2a3033;
-  --line-strong: #3a4145;
+  --brand-soft:  #0f2438;
+  --bg:          #0c1219;
+  --surface:     #121b24;
+  --surface-2:   #17222d;
+  --ink:         #eef4f9;
+  --ink-soft:    #c4d1dd;
+  --ink-muted:   #92a3b3;
+  --line:        #22303c;
+  --line-strong: #334453;
 }
 
 /* ----------------------------------------------------------------- reset */
@@ -259,16 +263,37 @@ ol.passos > li::before {
 ol.passos h3 { margin-bottom: var(--sp-1); }
 
 details.faq {
-  border-bottom: 1px solid var(--line); padding: var(--sp-4) 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: var(--sp-4) var(--sp-5); box-shadow: var(--shadow-sm);
+  transition: border-color .2s ease, box-shadow .2s ease;
 }
+details.faq + details.faq { margin-top: var(--sp-3); }
+details.faq[open] { border-color: color-mix(in srgb, var(--brand) 40%, var(--line)); box-shadow: var(--shadow-md); }
 details.faq summary {
-  cursor: pointer; font-weight: 600; font-size: var(--step-0);
-  list-style: none; display: flex; justify-content: space-between; gap: var(--sp-4);
+  cursor: pointer; font-weight: 620; font-size: var(--step-0); line-height: 1.35;
+  list-style: none; display: flex; justify-content: space-between; align-items: center;
+  gap: var(--sp-4); color: var(--ink);
 }
 details.faq summary::-webkit-details-marker { display: none; }
-details.faq summary::after { content: "+"; color: var(--brand); font-size: 1.4em; line-height: 1; }
-details.faq[open] summary::after { content: "\2212"; }
-details.faq p { margin-top: var(--sp-3); color: var(--ink-soft); }
+details.faq summary::after {
+  content: "+"; flex: none; color: var(--brand); font-size: 1.25rem; line-height: 1;
+  width: 30px; height: 30px; display: grid; place-items: center;
+  background: var(--brand-soft); border-radius: 50%;
+  transition: transform .25s ease;
+}
+details.faq[open] summary::after { content: "\2212"; transform: rotate(180deg); }
+details.faq summary:hover { color: var(--brand); }
+details.faq p { margin-top: var(--sp-3); color: var(--ink-soft); max-width: none; }
+
+/* Abertura animada onde o navegador suporta; onde nao, abre seco (sem quebrar) */
+@supports selector(::details-content) {
+  :root { interpolate-size: allow-keywords; }
+  details.faq::details-content {
+    block-size: 0; overflow: hidden;
+    transition: block-size .35s cubic-bezier(.2,.7,.3,1), content-visibility .35s allow-discrete;
+  }
+  details.faq[open]::details-content { block-size: auto; }
+}
 
 /* ---------------------------------------------------------------- citacao */
 blockquote, .citacao {
@@ -390,4 +415,253 @@ textarea { min-height: 120px; resize: vertical; }
   padding: var(--sp-6);
   font-family: var(--font-display); font-size: var(--step-2); line-height: 1.2;
   text-wrap: balance;
+}
+
+/* ==========================================================================
+   MOVIMENTO — entrada de secao, botao que pulsa, contador
+   Tudo desligado sozinho em prefers-reduced-motion (regra no topo do arquivo).
+   O .revelar so' esconde quando o kit.js esta vivo (html.js): sem JS a pagina
+   aparece inteira, nunca em branco.
+   ========================================================================== */
+.revelar { transition: opacity .7s cubic-bezier(.2,.7,.3,1), transform .7s cubic-bezier(.2,.7,.3,1); }
+html.js .revelar { opacity: 0; transform: translateY(22px); }
+html.js .revelar.visivel { opacity: 1; transform: none; }
+html.js .revelar-d1 { transition-delay: .08s; }
+html.js .revelar-d2 { transition-delay: .16s; }
+html.js .revelar-d3 { transition-delay: .24s; }
+@media (prefers-reduced-motion: reduce) {
+  html.js .revelar { opacity: 1 !important; transform: none !important; }
+}
+
+@keyframes pulso-marca {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 45%, transparent); }
+  70%  { box-shadow: 0 0 0 16px color-mix(in srgb, var(--brand) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 0%, transparent); }
+}
+@keyframes pulso-zap {
+  0%   { box-shadow: 0 0 0 0 rgba(37,211,102,.55); }
+  70%  { box-shadow: 0 0 0 18px rgba(37,211,102,0); }
+  100% { box-shadow: 0 0 0 0 rgba(37,211,102,0); }
+}
+.btn-pulso { animation: pulso-marca 2.4s ease-out infinite; }
+.zap-flutuante { animation: pulso-zap 2.6s ease-out infinite; }
+.btn-zap { background: var(--zap); color: #06301a; }
+.btn-zap:hover { color: #06301a; background: #1fbe5b; }
+
+/* ------------------------------------------------------------- carrossel */
+/* Rolagem com encaixe, sem biblioteca. As setas sao opcionais (kit.js). */
+.carrossel-caixa { position: relative; }
+.carrossel {
+  display: flex; gap: var(--sp-4); overflow-x: auto; scroll-snap-type: x mandatory;
+  scroll-behavior: smooth; padding-bottom: var(--sp-3);
+  scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent;
+}
+.carrossel > * {
+  scroll-snap-align: center; flex: 0 0 min(100%, 340px);
+}
+.carrossel.largo > * { flex-basis: min(100%, 520px); }
+.carrossel img { width: 100%; border-radius: var(--radius); }
+.carrossel-seta {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
+  width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-md); cursor: pointer; font-size: 1.1rem; line-height: 1;
+}
+.carrossel-seta:hover { border-color: var(--brand); color: var(--brand); }
+.carrossel-seta[hidden] { display: none; }
+.carrossel-seta.ant { left: -8px; }
+.carrossel-seta.prox { right: -8px; }
+@media (max-width: 700px) { .carrossel-seta { display: none; } }
+
+/* --------------------------------------------------------- antes e depois */
+.antes-depois { display: grid; gap: var(--sp-3); grid-template-columns: 1fr 1fr; }
+.antes-depois figure { margin: 0; position: relative; }
+.antes-depois img { width: 100%; aspect-ratio: 3/4; border-radius: var(--radius); }
+.antes-depois figcaption {
+  position: absolute; top: var(--sp-3); left: var(--sp-3);
+  background: color-mix(in srgb, var(--ink) 78%, transparent); color: #fff;
+  font-size: var(--step--1); font-weight: 600; padding: .25em .75em; border-radius: var(--radius-pill);
+  backdrop-filter: blur(4px);
+}
+
+/* --------------------------------------------------- avaliacoes (Google) */
+.estrelas { color: var(--estrela); letter-spacing: .08em; font-size: 1.05rem; line-height: 1; }
+.avaliacao {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: var(--sp-5); display: grid; gap: var(--sp-3); box-shadow: var(--shadow-sm);
+}
+.avaliacao p { max-width: none; color: var(--ink-soft); }
+.avaliacao .quem { display: flex; align-items: center; gap: var(--sp-3); }
+.avaliacao .inicial {
+  width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--brand-soft); color: var(--brand); font-weight: 650; flex: none;
+}
+.avaliacao .nome { font-weight: 620; font-size: var(--step-0); line-height: 1.2; }
+.avaliacao .quando { color: var(--ink-muted); font-size: var(--step--1); }
+.nota-google {
+  display: inline-flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-pill);
+  padding: .6em 1.2em; box-shadow: var(--shadow-sm); font-size: var(--step--1);
+}
+.nota-google b { font-size: var(--step-1); font-family: var(--font-display); }
+
+/* ------------------------------------------------------- convenios/logos */
+.logos {
+  display: flex; flex-wrap: wrap; gap: var(--sp-5) var(--sp-7);
+  align-items: center; justify-content: center;
+}
+.logos img { height: 34px; width: auto; filter: grayscale(1); opacity: .62; transition: all .25s ease; }
+.logos img:hover { filter: none; opacity: 1; }
+.logos span {
+  color: var(--ink-muted); font-weight: 620; font-size: var(--step-0);
+  letter-spacing: .01em;
+}
+
+/* ------------------------------------------------------------------ mapa */
+.mapa { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow-sm); }
+.mapa iframe { display: block; width: 100%; aspect-ratio: 16/10; border: 0; }
+
+/* --------------------------------------------------------- logo no topo */
+.marca img { height: 38px; width: auto; border-radius: 0; }
+.marca { display: inline-flex; align-items: center; gap: .6rem; }
+
+/* ------------------------------------------------------------ redes */
+.redes { display: flex; gap: var(--sp-3); flex-wrap: wrap; }
+.redes a {
+  width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--brand-soft); color: var(--brand); text-decoration: none; font-size: 1.15rem;
+  border: 1px solid transparent; transition: all .2s ease;
+}
+.redes a:hover { background: var(--brand); color: var(--brand-ink); transform: translateY(-2px); }
+
+/* ==========================================================================
+   PADRAO CONSULTORIO — o que faz a pagina "parecer de doutor"
+   Medido em site real de cirurgia bucomaxilo, no celular (390px).
+   ========================================================================== */
+
+/* Palavra destacada dentro do titulo — o recurso mais usado nesses sites */
+.destaque { color: var(--brand); }
+h1 .destaque, h2 .destaque { display: inline; }
+
+/* Risquinho embaixo do titulo do cartao */
+.divisor {
+  width: 56px; height: 3px; border-radius: 2px; background: var(--brand);
+  margin: var(--sp-3) auto; border: 0;
+}
+
+/* Cartao centrado com icone/imagem no topo (o formato de "especialidades" e
+   "sintomas"): imagem sangrando ate' a borda, titulo centrado, texto centrado */
+.cartao.centro { text-align: center; align-items: center; }
+.cartao.centro .icone { margin-inline: auto; width: 64px; height: 64px; font-size: 1.9rem; border-radius: var(--radius); }
+.cartao-foto { margin: calc(var(--sp-5) * -1) calc(var(--sp-5) * -1) 0; }
+.cartao-foto img { width: 100%; aspect-ratio: 4/3; border-radius: var(--radius) var(--radius) 0 0; }
+.cartao-marca {
+  background: var(--brand); border-color: var(--brand); color: var(--brand-ink);
+}
+.cartao-marca h3, .cartao-marca .numero { color: var(--brand-ink); }
+.cartao-marca p { color: color-mix(in srgb, var(--brand-ink) 82%, transparent); }
+.cartao-marca .icone { background: color-mix(in srgb, #fff 18%, transparent); color: var(--brand-ink); }
+.cartao-marca .divisor { background: color-mix(in srgb, var(--brand-ink) 60%, transparent); }
+
+/* Hero com foto sangrando no celular — o topo desses sites e' sempre assim */
+.hero-retrato {
+  width: 100%; max-width: 460px; margin-inline: auto;
+  aspect-ratio: 4/5; object-fit: cover;
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+}
+@media (max-width: 760px) {
+  .hero { padding-top: 0; }
+  .hero .duas-colunas { gap: var(--sp-5); }
+  /* foto primeiro, texto depois — e' a ordem que funciona no celular */
+  .hero .duas-colunas > img, .hero .duas-colunas > .hero-retrato { order: -1; }
+  .hero-retrato {
+    max-width: none; width: calc(100% + 2.5rem); margin-inline: -1.25rem;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg); aspect-ratio: 3/4;
+  }
+  .hero, .hero .centro, .hero .pilha { text-align: center; }
+  .hero h1, .hero .lede { margin-inline: auto; }
+  .hero .linha { justify-content: center; }
+}
+
+/* Alvo de toque grande no celular: botao principal ocupa a linha */
+@media (max-width: 560px) {
+  .btn-grande { width: 100%; padding-block: 1.05em; font-size: var(--step-0); }
+  .linha > .btn { flex: 1 1 100%; }
+  section { padding-block: var(--sp-7); }
+  .cartao { padding: var(--sp-4); }
+}
+
+/* Barra fixa embaixo no celular (logo + CTA). No desktop vira a bolha do zap. */
+.barra-fixa {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+  display: none; align-items: center; gap: var(--sp-3);
+  padding: .7rem 1rem calc(.7rem + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: saturate(1.4) blur(12px);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -6px 24px rgba(16,32,47,.10);
+}
+.barra-fixa img { height: 30px; width: auto; flex: none; }
+.barra-fixa .btn { flex: 1; padding-block: .85em; }
+@media (max-width: 760px) {
+  .barra-fixa { display: flex; }
+  .zap-flutuante { display: none; }
+  body { padding-bottom: 76px; }
+}
+
+/* Selo de confianca (ex.: "100% de avaliacoes positivas") */
+.selo-confianca {
+  display: inline-flex; align-items: center; gap: .5em;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: color-mix(in srgb, var(--accent) 88%, #000);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  padding: .45em 1em; border-radius: var(--radius-pill);
+  font-size: var(--step--1); font-weight: 620;
+}
+
+/* Foto com o nome por cima, no rodape da imagem (secao "conheca o doutor") */
+.foto-legenda { position: relative; }
+.foto-legenda img { width: 100%; aspect-ratio: 4/5; border-radius: var(--radius-lg); }
+.foto-legenda figcaption {
+  position: absolute; left: var(--sp-4); right: var(--sp-4); bottom: var(--sp-4);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  backdrop-filter: blur(8px); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: var(--sp-3) var(--sp-4);
+  box-shadow: var(--shadow-md);
+}
+.foto-legenda .nome { font-family: var(--font-display); font-size: var(--step-1); line-height: 1.1; }
+.foto-legenda .cargo { color: var(--ink-muted); font-size: var(--step--1); }
+
+/* ------------------------------------------------- icones de procedimento
+   Os arquivos ja nascem azuis (servem direto em <img src>). Com estas classes
+   eles viram MASCARA e assumem a cor da marca da pagina — trocar --brand
+   recolore todos de uma vez, sem editar SVG nenhum.
+   Uso: <span class="icone"><i class="icone-svg i-siso"></i></span>              */
+.icone-svg {
+  display: block; width: 60%; aspect-ratio: 1; background: currentColor;
+  -webkit-mask: var(--icone) center / contain no-repeat;
+          mask: var(--icone) center / contain no-repeat;
+}
+.cartao.centro .icone .icone-svg { width: 62%; }
+
+.i-acompanhamento { --icone: url("/s/_kit/img/icone-acompanhamento.svg"); }
+.i-agenda { --icone: url("/s/_kit/img/icone-agenda.svg"); }
+.i-anestesia { --icone: url("/s/_kit/img/icone-anestesia.svg"); }
+.i-atm { --icone: url("/s/_kit/img/icone-atm.svg"); }
+.i-convenio { --icone: url("/s/_kit/img/icone-convenio.svg"); }
+.i-dente { --icone: url("/s/_kit/img/icone-dente.svg"); }
+.i-enxerto { --icone: url("/s/_kit/img/icone-enxerto.svg"); }
+.i-implante { --icone: url("/s/_kit/img/icone-implante.svg"); }
+.i-ortognatica { --icone: url("/s/_kit/img/icone-ortognatica.svg"); }
+.i-patologia { --icone: url("/s/_kit/img/icone-patologia.svg"); }
+.i-radiografia { --icone: url("/s/_kit/img/icone-radiografia.svg"); }
+.i-recuperacao { --icone: url("/s/_kit/img/icone-recuperacao.svg"); }
+.i-siso { --icone: url("/s/_kit/img/icone-siso.svg"); }
+.i-sorriso { --icone: url("/s/_kit/img/icone-sorriso.svg"); }
+
+/* Fundo discreto para secao de destaque (nao usar na pagina inteira) */
+.fundo-suave {
+  background-color: var(--surface-2);
+  background-image: url("/s/_kit/img/fundo-linhas.svg");
+  background-size: 220px;
 }
