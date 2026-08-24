@@ -287,6 +287,52 @@ if "Copiloto CRM lead ping" not in s:
     else:
         done.append("F:FALHOU-anchor-senderNumber")
 
+# ---------- G) rota /resolve (numero -> JID certo, resolve LID) ----------
+# O WhatsApp vem migrando contatos pro endereçamento LID (Linked Identity).
+# Mandar direto pra "<numero>@s.whatsapp.net" sem essa migracao aplicada da
+# "sucesso" na API (sock.sendMessage nao lanca erro) mas a mensagem NUNCA
+# chega — sem erro nenhum pra avisar. sock.onWhatsApp() consulta o servidor
+# da WhatsApp de verdade e devolve o JID atual e correto (LID quando for o
+# caso). O CRM (crm_server.py) chama essa rota ANTES de mandar qualquer
+# mensagem pra um numero novo. Achado investigando 24/08: card do CRM e teste
+# direto no numero do cirurgiao e da esposa dele — os dois "sucesso" na API,
+# nenhum chegou; so o numero que ja tinha lid-mapping em cache funcionava.
+if "Copiloto rota /resolve" not in s:
+    anchor_g = "// Send a message\napp.post('/send', async (req, res) => {"
+    block_g = (
+        "// ===== Copiloto rota /resolve =====\n"
+        "// POST {phone: \"5511999999999\"} -> {jid, exists} — o JID de verdade pra\n"
+        "// mandar mensagem (pode ser @lid). exists=false quando o numero nao tem\n"
+        "// WhatsApp; nesse caso devolve o JID @s.whatsapp.net como fallback mesmo\n"
+        "// assim, pra quem chamou decidir o que fazer.\n"
+        "app.post('/resolve', async (req, res) => {\n"
+        "  if (!sock || connectionState !== 'connected') {\n"
+        "    return res.status(503).json({ error: 'Not connected to WhatsApp' });\n"
+        "  }\n"
+        "  const { phone } = req.body;\n"
+        "  if (!phone) return res.status(400).json({ error: 'phone is required' });\n"
+        "  const digits = String(phone).replace(/\\D/g, '');\n"
+        "  const fallbackJid = `${digits}@s.whatsapp.net`;\n"
+        "  try {\n"
+        "    const results = await sock.onWhatsApp(fallbackJid);\n"
+        "    const found = results && results[0];\n"
+        "    if (found && found.exists) {\n"
+        "      return res.json({ jid: found.jid, exists: true });\n"
+        "    }\n"
+        "    return res.json({ jid: fallbackJid, exists: false });\n"
+        "  } catch (err) {\n"
+        "    return res.json({ jid: fallbackJid, exists: null, error: err.message });\n"
+        "  }\n"
+        "});\n"
+        "\n"
+        "// Send a message\napp.post('/send', async (req, res) => {"
+    )
+    if anchor_g in s:
+        s = s.replace(anchor_g, block_g, 1)
+        done.append("G:resolve-lid")
+    else:
+        done.append("G:FALHOU-anchor-send-comment")
+
 open(F, "w", encoding="utf-8").write(s)
 print("Copiloto patches:", ", ".join(done) if done else "(nada)")
 

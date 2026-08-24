@@ -161,9 +161,33 @@ def _norm_phone(p):
     return re.sub(r"\D", "", p or "")
 
 
+BRIDGE_RESOLVE_URL = os.environ.get("COPILOTO_BRIDGE_RESOLVE_URL", "http://127.0.0.1:3000/resolve")
+
+
+def _resolve_jid(phone):
+    """Pergunta pro bridge (que pergunta pro proprio WhatsApp) qual o JID certo
+    pra esse numero — pode ser @lid. Sem isso, mandar direto pra
+    "<numero>@s.whatsapp.net" pode dar "sucesso" na API e a mensagem nunca
+    chegar (numero que migrou pro endereçamento LID e o bridge nunca resolveu
+    antes). Se a rota falhar por qualquer motivo, cai no formato antigo — pior
+    caso e' o mesmo comportamento de antes, nao trava o envio."""
+    digits = _norm_phone(phone)
+    fallback = f"{digits}@s.whatsapp.net"
+    try:
+        body = json.dumps({"phone": digits}).encode()
+        req = urllib.request.Request(
+            BRIDGE_RESOLVE_URL, data=body, headers={"Content-Type": "application/json"}, method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read() or b"{}")
+            return data.get("jid") or fallback
+    except Exception:
+        return fallback
+
+
 def _send_whatsapp(phone, text):
     """Chama o /send do bridge do proprio Hermes (so localhost, mesmo container)."""
-    chat_id = f"{_norm_phone(phone)}@s.whatsapp.net"
+    chat_id = _resolve_jid(phone)
     body = json.dumps({"chatId": chat_id, "message": text}).encode()
     req = urllib.request.Request(
         BRIDGE_SEND_URL, data=body, headers={"Content-Type": "application/json"}, method="POST"
