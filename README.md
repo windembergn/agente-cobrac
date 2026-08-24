@@ -24,6 +24,7 @@ No primeiro boot, um script de `cont-init` gera toda a configuração a partir d
 | **QR num link fixo** | página `/whatsapp` (protegida pela senha do painel) com QR que se atualiza e avisa "Conectado com sucesso" |
 | **Modo apresentação** | `/apresentacao` no grupo manda o link da vitrine (`/s/agente-cobrac`) e um exemplo de documento (`/s/exemplo-documento`), já publicados de fábrica |
 | **Mini-CRM** | funil visual em `/crm` — Novo Lead → Atendimento → Agendou → Compareceu → Exames → Cirurgia → Finalizado, com mensagem automática (editável) por etapa |
+| **Gerenciador de documentos** | `/documentos` — lista tudo publicado em `/s`, edita o conteúdo, exclui (com cópia de segurança) e manda o PDF direto no grupo principal |
 
 ---
 

@@ -25,13 +25,18 @@ import base64
 import json
 import os
 import re
+import shutil
 import sqlite3
+import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
+
+import yaml
 
 PORT = int(os.environ.get("COPILOTO_CRM_PORT", "8101"))
 DASH_USER = os.environ.get("DASH_USER", "admin")
@@ -41,6 +46,12 @@ CRM_DIR = os.path.join(DATA_DIR, "crm")
 DB_PATH = os.path.join(CRM_DIR, "crm.db")
 PINGS_DIR = os.path.join(CRM_DIR, "inbound_pings")
 BRIDGE_SEND_URL = os.environ.get("COPILOTO_BRIDGE_SEND_URL", "http://127.0.0.1:3000/send")
+BRIDGE_SEND_MEDIA_URL = os.environ.get("COPILOTO_BRIDGE_SEND_MEDIA_URL", "http://127.0.0.1:3000/send-media")
+SITES_DIR = os.path.join(DATA_DIR, "sites")
+BACKUPS_DIR = os.path.join(DATA_DIR, "copiloto-backups")
+CONFIG_PATH = os.path.join(DATA_DIR, "config.yaml")
+COPILOTO_DOMINIO = os.environ.get("COPILOTO_DOMINIO", "")
+CHROMIUM_PATH = os.environ.get("AGENT_BROWSER_EXECUTABLE_PATH", "/usr/bin/chromium")
 
 os.makedirs(CRM_DIR, exist_ok=True)
 os.makedirs(PINGS_DIR, exist_ok=True)
@@ -217,6 +228,147 @@ def _intake_loop():
         time.sleep(3)
 
 
+# ============================================================ DOCUMENTOS
+
+
+def _safe_site_name(nome):
+    """So letras/numeros/hifen — mesmo padrao de nome que a habilidade publicar-site usa."""
+    if not nome or not re.match(r"^[a-z0-9-]+$", nome):
+        return None
+    pasta = os.path.join(SITES_DIR, nome)
+    # Nunca deixa escapar de $DATA/sites nem mexer no _kit (e' do sistema, nao e' documento).
+    if nome == "_kit" or not os.path.abspath(pasta).startswith(os.path.abspath(SITES_DIR) + os.sep):
+        return None
+    return pasta
+
+
+def _list_sites():
+    out = []
+    if not os.path.isdir(SITES_DIR):
+        return out
+    for nome in sorted(os.listdir(SITES_DIR)):
+        if nome == "_kit" or nome.startswith("_"):
+            continue
+        pasta = os.path.join(SITES_DIR, nome)
+        idx = os.path.join(pasta, "index.html")
+        if not os.path.isfile(idx):
+            continue
+        try:
+            st = os.stat(idx)
+            with open(idx, encoding="utf-8", errors="ignore") as f:
+                head = f.read(4000)
+            is_doc = 'class="documento"' in head or "class='documento'" in head
+            title_m = re.search(r"<title>(.*?)</title>", head, re.S)
+            title = (title_m.group(1).strip() if title_m else nome)[:120]
+            out.append(
+                {
+                    "nome": nome,
+                    "titulo": title,
+                    "url": f"/s/{nome}",
+                    "tipo": "documento" if is_doc else "pagina",
+                    "modificado_em": int(st.st_mtime),
+                    "tamanho": st.st_size,
+                }
+            )
+        except OSError:
+            continue
+    out.sort(key=lambda x: x["modificado_em"], reverse=True)
+    return out
+
+
+def _soft_delete_site(nome):
+    """Mesma logica do 'copiloto site remover': guarda copia em copiloto-backups/
+    antes de tirar do ar — so que sem exigir grupo principal (esta e' uma
+    ferramenta autenticada por senha, nao um comando que chega por chat)."""
+    pasta = _safe_site_name(nome)
+    if not pasta or not os.path.isdir(pasta):
+        return False, "não encontrado"
+    destino = os.path.join(BACKUPS_DIR, time.strftime("%Y%m%d-%H%M%S") + "-site-" + nome)
+    os.makedirs(destino, exist_ok=True)
+    shutil.copytree(pasta, os.path.join(destino, nome), dirs_exist_ok=True)
+    with open(os.path.join(destino, "motivo.txt"), "w", encoding="utf-8") as f:
+        f.write("site removido do ar (via /documentos)\n")
+    shutil.rmtree(pasta, ignore_errors=True)
+    return True, None
+
+
+def _home_channel_chat_id():
+    try:
+        with open(CONFIG_PATH, encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+        return (
+            cfg.get("platforms", {})
+            .get("whatsapp", {})
+            .get("home_channel", {})
+            .get("chat_id")
+        )
+    except Exception:
+        return None
+
+
+def _generate_pdf(nome):
+    """Renderiza a pagina publicada (a URL publica de verdade, com o kit de CSS
+    carregado) num PDF via Chromium headless. Devolve o caminho do PDF
+    temporario (chamador precisa apagar) ou (None, erro)."""
+    if not COPILOTO_DOMINIO:
+        return None, "COPILOTO_DOMINIO não configurado nesta instalação."
+    url = f"https://{COPILOTO_DOMINIO}/s/{nome}"
+    out_path = os.path.join(tempfile.gettempdir(), f"doc-{nome}-{int(time.time())}.pdf")
+    try:
+        subprocess.run(
+            [
+                CHROMIUM_PATH,
+                "--headless",
+                "--disable-gpu",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--print-to-pdf-no-header",
+                f"--print-to-pdf={out_path}",
+                url,
+            ],
+            timeout=30,
+            capture_output=True,
+        )
+    except Exception as e:
+        return None, str(e)
+    if not os.path.isfile(out_path) or os.path.getsize(out_path) == 0:
+        return None, "Chromium não gerou o PDF."
+    return out_path, None
+
+
+def _send_pdf_to_group(nome, titulo):
+    chat_id = _home_channel_chat_id()
+    if not chat_id:
+        return False, "grupo principal não configurado (home_channel)."
+    pdf_path, err = _generate_pdf(nome)
+    if err:
+        return False, err
+    try:
+        body = json.dumps(
+            {
+                "chatId": chat_id,
+                "filePath": pdf_path,
+                "mediaType": "document",
+                "fileName": f"{nome}.pdf",
+                "caption": titulo or nome,
+            }
+        ).encode()
+        req = urllib.request.Request(
+            BRIDGE_SEND_MEDIA_URL, data=body, headers={"Content-Type": "application/json"}, method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read() or b"{}")
+            ok = bool(data.get("success"))
+            return ok, None if ok else data.get("error", "falha desconhecida")
+    except Exception as e:
+        return False, str(e)
+    finally:
+        try:
+            os.unlink(pdf_path)
+        except OSError:
+            pass
+
+
 # ============================================================ FRONTEND (HTML)
 PAGE = """<!doctype html>
 <html lang="pt-BR">
@@ -269,7 +421,10 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
     <h1>CRM — funil do consultório</h1>
     <div class="sub">arraste o card entre as colunas · toque no ✉️ pra editar a mensagem de cada etapa</div>
   </div>
-  <button class="btn" id="btnNovo">+ Novo Lead</button>
+  <div style="display:flex;gap:8px">
+    <a class="btn btn-ghost" href="/documentos" style="text-decoration:none;display:inline-flex;align-items:center">📄 Documentos</a>
+    <button class="btn" id="btnNovo">+ Novo Lead</button>
+  </div>
 </header>
 <div class="board" id="board"></div>
 
@@ -430,6 +585,141 @@ setInterval(load, 15000);
 PAGE = PAGE.replace("__STATUSES_JSON__", json.dumps(STATUSES, ensure_ascii=False))
 
 
+DOCS_PAGE = """<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documentos — Copiloto</title>
+<style>
+:root{--bg:#0e131a;--panel:#151c26;--panel-2:#1c2531;--line:#293445;--ink:#e7ecf3;--ink-soft:#98a7b8;--brand:#0e5aa7}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;-webkit-font-smoothing:antialiased}
+header{position:sticky;top:0;z-index:20;background:rgba(14,19,26,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;font-weight:650}
+header .sub{font-size:12px;color:var(--ink-soft)}
+.btn{background:var(--brand);color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer}
+.btn:hover{filter:brightness(1.1)}
+.btn-ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn-danger{background:#7a2231}
+.wrap{max-width:900px;margin:0 auto;padding:16px}
+.item{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:12px}
+.item .info{flex:1;min-width:0}
+.item b{display:block;font-size:14px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .meta{font-size:11px;color:var(--ink-soft)}
+.tag{font-size:10px;background:var(--panel-2);border:1px solid var(--line);border-radius:20px;padding:1px 8px;color:var(--ink-soft)}
+.item a.open{color:var(--brand);text-decoration:none;font-size:12px}
+.empty{color:var(--ink-soft);font-size:13px;padding:30px 0;text-align:center}
+dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:0;width:min(720px,94vw)}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+.dlg-body{padding:16px}
+.dlg-body h2{font-size:15px;margin:0 0 12px}
+textarea#fContent{width:100%;min-height:50vh;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+.dlg-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap}
+.status{font-size:12px;color:var(--ink-soft);margin-top:8px}
+@media (max-width:640px){.item{flex-wrap:wrap}.item .info{width:100%}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Documentos e páginas publicadas</h1>
+    <div class="sub">tudo que o Copiloto publicou em /s — edite, baixe ou mande no grupo</div>
+  </div>
+  <a class="btn btn-ghost" href="/crm" style="text-decoration:none;display:inline-flex;align-items:center">← CRM</a>
+</header>
+<div class="wrap" id="list"></div>
+
+<dialog id="dlgEdit">
+  <div class="dlg-body">
+    <h2 id="dlgTitle">Editar</h2>
+    <textarea id="fContent" spellcheck="false"></textarea>
+    <div class="status" id="dlgStatus"></div>
+    <div class="dlg-actions">
+      <button class="btn btn-danger" id="btnDelete" style="margin-right:auto">Excluir</button>
+      <button class="btn btn-ghost" id="btnOpen">Abrir página</button>
+      <button class="btn btn-ghost" id="btnSendGroup">📲 Enviar PDF no grupo</button>
+      <button class="btn btn-ghost" id="btnCancel">Fechar</button>
+      <button class="btn" id="btnSave">Salvar</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+let editingNome = null;
+
+async function api(path, opts) {
+  const r = await fetch(path, Object.assign({headers: {'Content-Type': 'application/json'}}, opts || {}));
+  if (!r.ok) throw new Error('erro ' + r.status);
+  return r.status === 204 ? null : r.json();
+}
+
+function fmtBytes(n) { return n < 1024*1024 ? Math.round(n/1024)+' KB' : (n/1024/1024).toFixed(1)+' MB'; }
+function fmtDate(ts) { return new Date(ts*1000).toLocaleString('pt-BR'); }
+function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+async function load() {
+  const items = await api('/documentos/api/list');
+  const el = document.getElementById('list');
+  if (!items.length) { el.innerHTML = '<div class="empty">Nenhum documento publicado ainda.</div>'; return; }
+  el.innerHTML = items.map(it => `
+    <div class="item">
+      <div class="info">
+        <b>${escapeHtml(it.titulo)}</b>
+        <div class="meta">
+          <span class="tag">${it.tipo === 'documento' ? 'documento' : 'página'}</span>
+          ${fmtDate(it.modificado_em)} · ${fmtBytes(it.tamanho)}
+        </div>
+      </div>
+      <a class="open" href="${it.url}" target="_blank" rel="noopener">abrir ↗</a>
+      <button class="btn btn-ghost" data-nome="${it.nome}" data-titulo="${escapeHtml(it.titulo)}">Editar</button>
+    </div>
+  `).join('');
+  el.querySelectorAll('button[data-nome]').forEach(b => b.addEventListener('click', () => openEdit(b.dataset.nome, b.dataset.titulo)));
+}
+
+async function openEdit(nome, titulo) {
+  editingNome = nome;
+  document.getElementById('dlgTitle').textContent = titulo || nome;
+  document.getElementById('dlgStatus').textContent = 'Carregando...';
+  document.getElementById('dlgEdit').showModal();
+  const data = await api('/documentos/api/' + nome + '/content');
+  document.getElementById('fContent').value = data.content;
+  document.getElementById('dlgStatus').textContent = '';
+}
+
+document.getElementById('btnCancel').addEventListener('click', () => document.getElementById('dlgEdit').close());
+document.getElementById('btnOpen').addEventListener('click', () => window.open('/s/' + editingNome, '_blank'));
+document.getElementById('btnSave').addEventListener('click', async () => {
+  const st = document.getElementById('dlgStatus');
+  st.textContent = 'Salvando...';
+  try {
+    await api('/documentos/api/' + editingNome + '/content', {method: 'PUT', body: JSON.stringify({content: document.getElementById('fContent').value})});
+    st.textContent = '✅ Salvo.';
+  } catch (e) { st.textContent = '❌ Falha ao salvar.'; }
+});
+document.getElementById('btnDelete').addEventListener('click', async () => {
+  if (!confirm('Excluir "' + editingNome + '"? (fica guardado como cópia de segurança)')) return;
+  await api('/documentos/api/' + editingNome, {method: 'DELETE'});
+  document.getElementById('dlgEdit').close();
+  load();
+});
+document.getElementById('btnSendGroup').addEventListener('click', async () => {
+  const st = document.getElementById('dlgStatus');
+  st.textContent = 'Gerando PDF e enviando no grupo...';
+  try {
+    await api('/documentos/api/' + editingNome + '/send-group', {method: 'POST'});
+    st.textContent = '✅ Enviado no grupo.';
+  } catch (e) { st.textContent = '❌ Falha ao enviar — confira se o WhatsApp está conectado.'; }
+});
+
+load();
+</script>
+</body>
+</html>
+"""
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -459,7 +749,7 @@ class H(BaseHTTPRequestHandler):
             return {}
 
     def _guard(self):
-        if not self.path.startswith("/crm"):
+        if not (self.path.startswith("/crm") or self.path.startswith("/documentos")):
             self.send_response(404)
             self.end_headers()
             return False
@@ -494,6 +784,29 @@ class H(BaseHTTPRequestHandler):
                 [{"status": r["status"], "message": r["message"], "enabled": bool(r["enabled"])} for r in rows]
             )
 
+        if path in ("/documentos", "/documentos/"):
+            body = DOCS_PAGE.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if path == "/documentos/api/list":
+            return self._json(_list_sites())
+
+        m = re.match(r"^/documentos/api/([a-z0-9-]+)/content$", path)
+        if m:
+            pasta = _safe_site_name(m.group(1))
+            if not pasta or not os.path.isdir(pasta):
+                return self._json({"error": "não encontrado"}, 404)
+            try:
+                with open(os.path.join(pasta, "index.html"), encoding="utf-8") as f:
+                    return self._json({"content": f.read()})
+            except OSError as e:
+                return self._json({"error": str(e)}, 500)
+
         self.send_response(404)
         self.end_headers()
 
@@ -518,6 +831,19 @@ class H(BaseHTTPRequestHandler):
                 conn.commit()
                 card_id = cur.lastrowid
             return self._json({"id": card_id}, 201)
+
+        m = re.match(r"^/documentos/api/([a-z0-9-]+)/send-group$", path)
+        if m:
+            nome = m.group(1)
+            pasta = _safe_site_name(nome)
+            if not pasta or not os.path.isdir(pasta):
+                return self._json({"error": "não encontrado"}, 404)
+            titulo = next((s["titulo"] for s in _list_sites() if s["nome"] == nome), nome)
+            ok, err = _send_pdf_to_group(nome, titulo)
+            if not ok:
+                return self._json({"error": err}, 502)
+            return self._json({"ok": True})
+
         self.send_response(404)
         self.end_headers()
 
@@ -574,6 +900,29 @@ class H(BaseHTTPRequestHandler):
                 )
                 conn.commit()
             return self._json({"ok": True})
+
+        m = re.match(r"^/documentos/api/([a-z0-9-]+)/content$", path)
+        if m:
+            pasta = _safe_site_name(m.group(1))
+            if not pasta or not os.path.isdir(pasta):
+                return self._json({"error": "não encontrado"}, 404)
+            b = self._body()
+            content = b.get("content")
+            if content is None:
+                return self._json({"error": "content é obrigatório"}, 400)
+            idx = os.path.join(pasta, "index.html")
+            # Guarda uma copia antes de sobrescrever — mesmo espirito do
+            # "copiloto ajuste" antes de qualquer mudanca.
+            backup_dir = os.path.join(BACKUPS_DIR, time.strftime("%Y%m%d-%H%M%S") + "-edicao-" + m.group(1))
+            os.makedirs(backup_dir, exist_ok=True)
+            try:
+                shutil.copy2(idx, os.path.join(backup_dir, "index.html"))
+            except OSError:
+                pass
+            with open(idx, "w", encoding="utf-8") as f:
+                f.write(content)
+            return self._json({"ok": True})
+
         self.send_response(404)
         self.end_headers()
 
@@ -591,6 +940,16 @@ class H(BaseHTTPRequestHandler):
             self.send_response(204)
             self.end_headers()
             return
+
+        m = re.match(r"^/documentos/api/([a-z0-9-]+)$", path)
+        if m:
+            ok, err = _soft_delete_site(m.group(1))
+            if not ok:
+                return self._json({"error": err}, 404)
+            self.send_response(204)
+            self.end_headers()
+            return
+
         self.send_response(404)
         self.end_headers()
 

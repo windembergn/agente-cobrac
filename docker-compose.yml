@@ -51,8 +51,9 @@ services:
         - traefik.http.routers.cpqr.service=cpqr
         - traefik.http.routers.cpqr.priority=1000
         - traefik.http.services.cpqr.loadbalancer.server.port=8099
-        # Mini-CRM (funil do consultorio) em /crm — mesma senha do painel
-        - "traefik.http.routers.cpcrm.rule=Host(`SEU-DOMINIO`) && PathPrefix(`/crm`)"
+        # Mini-CRM (funil do consultorio) em /crm + gerenciador de documentos em
+        # /documentos — mesma senha do painel, mesmo servico (porta 8101)
+        - "traefik.http.routers.cpcrm.rule=Host(`SEU-DOMINIO`) && (PathPrefix(`/crm`) || PathPrefix(`/documentos`))"
         - traefik.http.routers.cpcrm.entrypoints=websecure
         - traefik.http.routers.cpcrm.tls.certresolver=le
         - traefik.http.routers.cpcrm.service=cpcrm
