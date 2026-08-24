@@ -22,6 +22,8 @@ No primeiro boot, um script de `cont-init` gera toda a configuração a partir d
 | **from-me** | responde inclusive quando o próprio dono escreve no grupo |
 | **Só um grupo** | ativado pelo comando `/main`; nunca responde em conversa privada nem em outros grupos |
 | **QR num link fixo** | página `/whatsapp` (protegida pela senha do painel) com QR que se atualiza e avisa "Conectado com sucesso" |
+| **Modo apresentação** | `/apresentacao` no grupo manda o link da vitrine (`/s/agente-cobrac`) e um exemplo de documento (`/s/exemplo-documento`), já publicados de fábrica |
+| **Mini-CRM** | funil visual em `/crm` — Novo Lead → Atendimento → Agendou → Compareceu → Exames → Cirurgia → Finalizado, com mensagem automática (editável) por etapa |
 
 ---
 
@@ -50,9 +52,10 @@ As demais (`HERMES_DASHBOARD`, `WHATSAPP_MODE=bot`, `WHATSAPP_ENABLED`, `WHATSAP
 
 ### Roteamento no Traefik
 
-A stack expõe dois caminhos no mesmo domínio (veja `docker-compose.yml`):
+A stack expõe três caminhos no mesmo domínio (veja `docker-compose.yml`):
 - `/` → painel do agente (porta 9119)
-- `/whatsapp` → página de QR (porta 8099), com **prioridade maior** para não cair no painel
+- `/whatsapp` e `/s` → página de QR e sites publicados (porta 8099), com **prioridade maior** para não cair no painel
+- `/crm` → mini-CRM (porta 8101), mesma senha do painel, também com prioridade maior
 
 ---
 
@@ -72,12 +75,16 @@ Dockerfile                       # FROM hermes-agent + patches + config no boot
 docker-compose.yml               # stack de exemplo (Swarm + Traefik)
 assets/
   SOUL.md                        # persona cirúrgica
-  patch-bridge.py                # patches do bridge (debounce 10s, /main, no-echo)
+  patch-bridge.py                # patches do bridge (debounce 10s, /main, no-echo, lead ping do CRM)
   qr_server.py                   # servidor da página /whatsapp (QR + vigia do /main)
+  crm_server.py                  # servidor do mini-CRM (/crm) — funil + mensagem automática por etapa
+  apresentacao/                  # skill do modo apresentação (/apresentacao)
+  sites_padrao/                  # vitrine + exemplo de documento, publicados no primeiro boot
 cont-init/
   03-copiloto                    # gera config.yaml/SOUL/patch no primeiro boot
 s6/
   copiloto-qr/                   # serviço s6 do servidor de QR
+  copiloto-crm/                  # serviço s6 do mini-CRM
 ```
 
 ## Build a partir do código

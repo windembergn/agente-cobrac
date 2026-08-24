@@ -199,6 +199,31 @@ if [ -d /opt/copiloto/site_kit ]; then
   cp /opt/copiloto/site_kit/SKILL.md "$DATA/skills/publicar-site/SKILL.md" 2>/dev/null || true
 fi
 
+# ---------------------------------------------------------------------------
+# 3c) MODO APRESENTACAO — vitrine + exemplo de documento, so no PRIMEIRO boot
+#
+# Diferente do _kit acima: essas paginas viram conteudo DO CIRURGIAO assim que
+# instala (ele pode trocar nome, foto, cor). Por isso nao sobrescrevemos a cada
+# boot — so semeamos se ainda nao existir, pra nao apagar customizacao.
+# ---------------------------------------------------------------------------
+if [ -d /opt/copiloto/sites_padrao ]; then
+  for nome in agente-cobrac exemplo-documento; do
+    if [ -d "/opt/copiloto/sites_padrao/$nome" ] && [ ! -d "$DATA/sites/$nome" ]; then
+      mkdir -p "$DATA/sites/$nome"
+      cp -r "/opt/copiloto/sites_padrao/$nome/." "$DATA/sites/$nome/" 2>/dev/null || true
+    fi
+  done
+fi
+if [ -d /opt/copiloto/apresentacao ] && [ ! -d "$DATA/skills/apresentacao" ]; then
+  mkdir -p "$DATA/skills/apresentacao"
+  cp /opt/copiloto/apresentacao/SKILL.md "$DATA/skills/apresentacao/SKILL.md" 2>/dev/null || true
+fi
+# Essas paginas e a skill vem prontas da imagem, nao foi o agente que criou: sem
+# isto o "restaurar original" as trataria como criacao do agente e apagaria.
+for nome in apresentacao; do
+  grep -qx "$nome" "$FAB/skills_originais.txt" 2>/dev/null || echo "$nome" >> "$FAB/skills_originais.txt"
+done
+
 # Atalho que o agente usa: /opt/data/copiloto <verbo>
 cat > "$DATA/copiloto" <<'SH'
 #!/bin/sh

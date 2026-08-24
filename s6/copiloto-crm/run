@@ -1,0 +1,2 @@
+#!/command/with-contenv sh
+exec /opt/hermes/.venv/bin/python /opt/copiloto/crm_server.py

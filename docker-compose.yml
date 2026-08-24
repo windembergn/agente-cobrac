@@ -51,6 +51,13 @@ services:
         - traefik.http.routers.cpqr.service=cpqr
         - traefik.http.routers.cpqr.priority=1000
         - traefik.http.services.cpqr.loadbalancer.server.port=8099
+        # Mini-CRM (funil do consultorio) em /crm — mesma senha do painel
+        - "traefik.http.routers.cpcrm.rule=Host(`SEU-DOMINIO`) && PathPrefix(`/crm`)"
+        - traefik.http.routers.cpcrm.entrypoints=websecure
+        - traefik.http.routers.cpcrm.tls.certresolver=le
+        - traefik.http.routers.cpcrm.service=cpcrm
+        - traefik.http.routers.cpcrm.priority=1000
+        - traefik.http.services.cpcrm.loadbalancer.server.port=8101
         # Painel do agente (catch-all do dominio)
         - "traefik.http.routers.cpdash.rule=Host(`SEU-DOMINIO`)"
         - traefik.http.routers.cpdash.entrypoints=websecure

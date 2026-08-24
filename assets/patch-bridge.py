@@ -257,6 +257,36 @@ if "Copiloto no-echo" not in s:
     else:
         done.append("B:FALHOU-anchor-send")
 
+# ---------- F) lead ping do mini-CRM ----------
+# Registra TODO contato direto (nao-grupo) que manda mensagem, mesmo quando o
+# WHATSAPP_DM_POLICY bloqueia a resposta do agente (default do produto: DM
+# desligado, so grupo ativado responde). Sem isto, um lead que so manda DM
+# nunca aparece no funil "Novo Lead" do CRM. So escreve um arquivo — nao muda
+# em nada se o agente responde ou nao; o crm_server.py e' quem le e decide.
+if "Copiloto CRM lead ping" not in s:
+    anchor_f = "const senderNumber = senderId.replace(/@.*/, '');"
+    block_f = anchor_f + "\n" + (
+        "      // ===== Copiloto CRM lead ping =====\n"
+        "      if (!msg.key.fromMe && !isGroup) {\n"
+        "        import('node:fs').then((fs) => {\n"
+        "          try {\n"
+        "            const dir = '/opt/data/crm/inbound_pings';\n"
+        "            fs.mkdirSync(dir, { recursive: true });\n"
+        "            const uniq = Date.now() + '-' + Math.random().toString(36).slice(2, 8);\n"
+        "            fs.writeFileSync(dir + '/' + uniq + '.json', JSON.stringify({\n"
+        "              phone: senderNumber, chat_id: String(chatId),\n"
+        "              push_name: String(msg.pushName || ''), ts: Date.now(),\n"
+        "            }));\n"
+        "          } catch (err) {}\n"
+        "        }).catch(() => {});\n"
+        "      }"
+    )
+    if anchor_f in s:
+        s = s.replace(anchor_f, block_f, 1)
+        done.append("F:crm-lead-ping")
+    else:
+        done.append("F:FALHOU-anchor-senderNumber")
+
 open(F, "w", encoding="utf-8").write(s)
 print("Copiloto patches:", ", ".join(done) if done else "(nada)")
 
