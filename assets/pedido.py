@@ -547,8 +547,25 @@ def _pendencias(p):
     return "; ".join(faltando) if faltando else "nenhuma"
 
 
-def render_pagina(p):
-    """Devolve o HTML completo da pagina do pedido."""
+PARTES = ("completo", "guia", "relatorio")
+
+_TITULO_PARTE = {
+    "completo": "Solicitação de cirurgia",
+    "guia": "Guia de solicitação de internação",
+    "relatorio": "Relatório médico para solicitação",
+}
+
+
+def render_pagina(p, parte="completo"):
+    """Devolve o HTML da pagina do pedido.
+
+    Sao DUAS pecas com destinos diferentes: a guia e' o formulario DA OPERADORA
+    (tem campo que so ela preenche e tres assinaturas) e o relatorio e' o anexo
+    que justifica, assinado so pelo cirurgiao. No balcao vao grampeadas; no
+    portal da operadora sobe um arquivo para cada. Por isso a mesma ficha gera
+    tres saidas: `completo`, `guia` e `relatorio`."""
+    if parte not in PARTES:
+        parte = "completo"
     c = _cirurgia(p.get("tipo", ""))
     indicacao, justificativa, conduta = montar_textos(p)
     titulo_cirurgia = (p.get("tipo_livre") or "").strip() or c["nome"]
@@ -602,12 +619,12 @@ def render_pagina(p):
     tipo_int_lbl = dict(TIPO_INTERNACAO).get(p.get("tipo_internacao", c["tipo_internacao"]), "Cirúrgica")
     regime_lbl = dict(REGIME).get(p.get("regime", c["regime"]), "Hospitalar")
 
-    return f"""<!doctype html>
+    cabeca = f"""<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Solicitação de cirurgia — {_e(paciente)}</title>
+<title>{_TITULO_PARTE[parte]} — {_e(paciente)}</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦷</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -618,11 +635,24 @@ def render_pagina(p):
 <style>:root {{ --brand: #0e5aa7; }}</style>
 </head>
 <body>
+"""
 
+    # Barra de acoes: nao sai no papel (@media print esconde .acoes-doc), entao
+    # o atalho entre as pecas fica aqui e nao suja o documento impresso.
+    outras = {
+        "completo": '<a class="btn btn-vazado" href="guia.html">Só a guia</a>\n  <a class="btn btn-vazado" href="relatorio.html">Só o relatório</a>',
+        "guia": '<a class="btn btn-vazado" href="relatorio.html">Ver o relatório</a>\n  <a class="btn btn-vazado" href="./">Ver os dois</a>',
+        "relatorio": '<a class="btn btn-vazado" href="guia.html">Ver a guia</a>\n  <a class="btn btn-vazado" href="./">Ver os dois</a>',
+    }[parte]
+
+    acoes = f"""
 <div class="acoes-doc" style="margin-top:var(--sp-5)">
   <button class="btn" onclick="window.print()">🖨️ Imprimir / salvar em PDF</button>
+  {outras}
 </div>
+"""
 
+    relatorio = f"""
 <article class="documento">
 
   <header>
@@ -672,7 +702,9 @@ def render_pagina(p):
   <p class="small muted" style="margin-top:var(--sp-6)">Minuta gerada para revisão e assinatura do cirurgião responsável.</p>
 
 </article>
+"""
 
+    guia = f"""
 <article class="documento guia">
 
   <table class="guia-topo">
@@ -793,10 +825,10 @@ def render_pagina(p):
   <p class="small muted" style="margin-top:var(--sp-5)">Guia preenchida pelo Copiloto a partir dos dados informados pelo cirurgião. Confira os códigos na tabela da operadora antes de protocolar.{(" Fornecedores indicados: " + _e(forn_txt) + ".") if forn_txt else ""}</p>
 
 </article>
-
-</body>
-</html>
 """
+
+    corpo = {"completo": relatorio + guia, "guia": guia, "relatorio": relatorio}[parte]
+    return cabeca + acoes + corpo + "\n</body>\n</html>\n"
 
 
 # ============================================================== PERSISTENCIA
@@ -815,8 +847,12 @@ def salvar_pedido(sites_dir, p, nome=None):
         nome = f"{nome}-{i}"
         pasta = os.path.join(sites_dir, nome)
     os.makedirs(pasta, exist_ok=True)
-    with open(os.path.join(pasta, "index.html"), "w", encoding="utf-8") as f:
-        f.write(render_pagina(p))
+    # Tres arquivos do MESMO preenchimento: o combinado (index), a guia sozinha
+    # e o relatorio sozinho — porque no portal da operadora sobe um arquivo para
+    # cada peca, e no balcao vao grampeados.
+    for arquivo, parte in (("index.html", "completo"), ("guia.html", "guia"), ("relatorio.html", "relatorio")):
+        with open(os.path.join(pasta, arquivo), "w", encoding="utf-8") as f:
+            f.write(render_pagina(p, parte))
     p = dict(p)
     p["_atualizado_em"] = int(time.time())
     with open(os.path.join(pasta, "pedido.json"), "w", encoding="utf-8") as f:
@@ -1289,14 +1325,23 @@ async function gerar(){
     const destino = j.url || ("/s/" + j.nome);
     const box = $("resultado");
     box.classList.remove("sumiu");
+    // Duas peças, destinos diferentes: a guia é o formulário da operadora e o
+    // relatório é o anexo que justifica. O portal costuma pedir um arquivo para
+    // cada; no balcão vão grampeados — por isso as três saídas.
     box.innerHTML = '<h2>✅ Pedido gerado</h2>' +
-      '<p style="font-size:13px;margin:.2em 0"><a href="' + destino + '" target="_blank">' + destino + '</a></p>' +
+      '<p style="font-size:13px;margin:.2em 0">Abrir: ' +
+      '<a href="' + destino + '/guia.html" target="_blank">só a guia</a> · ' +
+      '<a href="' + destino + '/relatorio.html" target="_blank">só o relatório</a> · ' +
+      '<a href="' + destino + '" target="_blank">os dois</a></p>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">' +
-      '<a class="btn btn-ghost" href="' + destino + '" target="_blank" style="text-decoration:none">Abrir / imprimir</a>' +
-      '<button class="btn btn-ghost" id="btnZap">📲 Mandar PDF no grupo</button>' +
+      '<button class="btn btn-ghost" data-parte="guia">📲 Mandar a guia</button>' +
+      '<button class="btn btn-ghost" data-parte="relatorio">📲 Mandar o relatório</button>' +
+      '<button class="btn btn-ghost" data-parte="">📲 Mandar os dois</button>' +
       '<a class="btn btn-ghost" href="/crm/pedido" style="text-decoration:none">+ Novo pedido</a></div>' +
       '<div class="status" id="statusZap" style="text-align:left"></div>';
-    $("btnZap").onclick = mandarZap;
+    box.querySelectorAll("button[data-parte]").forEach(b => {
+      b.onclick = () => mandarZap(b.dataset.parte);
+    });
     $("status").textContent = "";
     window.scrollTo({top: 0, behavior: "smooth"});
   } catch (e) {
@@ -1305,13 +1350,15 @@ async function gerar(){
   $("btnGerar").disabled = false;
 }
 
-async function mandarZap(){
+async function mandarZap(parte){
   const s = $("statusZap");
-  s.textContent = "Gerando o PDF e mandando...";
+  const nome = parte === "guia" ? "a guia" : (parte === "relatorio" ? "o relatório" : "o pedido completo");
+  s.textContent = "Gerando o PDF e mandando " + nome + "...";
   try {
-    const r = await fetch("/documentos/api/" + editando + "/send-group", {method: "POST"});
+    const url = "/documentos/api/" + editando + "/send-group" + (parte ? ("?parte=" + parte) : "");
+    const r = await fetch(url, {method: "POST"});
     const j = await r.json();
-    s.textContent = r.ok ? "✅ Mandei no grupo principal." : ("Não deu: " + (j.error || ""));
+    s.textContent = r.ok ? ("✅ Mandei " + nome + " no grupo principal.") : ("Não deu: " + (j.error || ""));
   } catch (e) {
     s.textContent = "Não deu: " + e.message;
   }

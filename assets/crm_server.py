@@ -447,14 +447,25 @@ def _home_channel_chat_id():
         return None
 
 
-def _generate_pdf(nome):
+def _generate_pdf(nome, parte=None):
     """Renderiza a pagina publicada (a URL publica de verdade, com o kit de CSS
     carregado) num PDF via Chromium headless. Devolve o caminho do PDF
-    temporario (chamador precisa apagar) ou (None, erro)."""
+    temporario (chamador precisa apagar) ou (None, erro).
+
+    `parte` ("guia" / "relatorio") aponta para o arquivo separado que o pedido
+    de cirurgia grava ao lado do index — sao duas pecas com destinos
+    diferentes (portal da operadora pede um arquivo para cada)."""
     if not COPILOTO_DOMINIO:
         return None, "COPILOTO_DOMINIO não configurado nesta instalação."
-    url = f"https://{COPILOTO_DOMINIO}/s/{nome}"
-    out_path = os.path.join(tempfile.gettempdir(), f"doc-{nome}-{int(time.time())}.pdf")
+    if parte:
+        pasta = _safe_site_name(nome)
+        if not pasta or not os.path.isfile(os.path.join(pasta, f"{parte}.html")):
+            return None, f"esta página não tem a parte '{parte}' (só pedidos de cirurgia têm)."
+        url = f"https://{COPILOTO_DOMINIO}/s/{nome}/{parte}.html"
+    else:
+        url = f"https://{COPILOTO_DOMINIO}/s/{nome}"
+    sufixo = f"-{parte}" if parte else ""
+    out_path = os.path.join(tempfile.gettempdir(), f"doc-{nome}{sufixo}-{int(time.time())}.pdf")
     try:
         subprocess.run(
             [
@@ -477,21 +488,28 @@ def _generate_pdf(nome):
     return out_path, None
 
 
-def _send_pdf_to_group(nome, titulo):
+_ROTULO_PARTE = {"guia": "Guia de solicitação de internação", "relatorio": "Relatório médico"}
+
+
+def _send_pdf_to_group(nome, titulo, parte=None):
     chat_id = _home_channel_chat_id()
     if not chat_id:
         return False, "grupo principal não configurado (home_channel)."
-    pdf_path, err = _generate_pdf(nome)
+    pdf_path, err = _generate_pdf(nome, parte)
     if err:
         return False, err
+    sufixo = f"-{parte}" if parte else ""
+    legenda = titulo or nome
+    if parte:
+        legenda = f"{_ROTULO_PARTE.get(parte, parte)} — {legenda}"
     try:
         body = json.dumps(
             {
                 "chatId": chat_id,
                 "filePath": pdf_path,
                 "mediaType": "document",
-                "fileName": f"{nome}.pdf",
-                "caption": titulo or nome,
+                "fileName": f"{nome}{sufixo}.pdf",
+                "caption": legenda,
             }
         ).encode()
         req = urllib.request.Request(
@@ -799,6 +817,8 @@ textarea#fContent{width:100%;min-height:50vh;background:var(--bg);border:1px sol
     <div class="dlg-actions">
       <button class="btn btn-danger" id="btnDelete" style="margin-right:auto">Excluir</button>
       <button class="btn btn-ghost" id="btnOpen">Abrir página</button>
+      <button class="btn btn-ghost" id="btnSendGuia" style="display:none">📲 Guia</button>
+      <button class="btn btn-ghost" id="btnSendRelatorio" style="display:none">📲 Relatório</button>
       <button class="btn btn-ghost" id="btnSendGroup">📲 Enviar PDF no grupo</button>
       <button class="btn btn-ghost" id="btnCancel">Fechar</button>
       <button class="btn" id="btnSave">Salvar</button>
@@ -934,14 +954,22 @@ async function openEdit(nome, titulo, tipo) {
   document.getElementById('dlgStatus').textContent = 'Carregando...';
   document.getElementById('dlgEdit').showModal();
   const btnToggle = document.getElementById('btnToggleHtml');
+  const ehPedido = tipo === 'pedido';
+  document.getElementById('btnSendGuia').style.display = ehPedido ? '' : 'none';
+  document.getElementById('btnSendRelatorio').style.display = ehPedido ? '' : 'none';
+  document.getElementById('btnSendGroup').textContent = ehPedido ? '📲 Os dois' : '📲 Enviar PDF no grupo';
 
-  if (tipo === 'documento') {
+  if (tipo === 'documento' || tipo === 'pedido') {
     try {
       fieldsState = await api('/documentos/api/' + nome + '/fields');
       btnToggle.style.display = '';
       setModo(false);
       renderFieldsForm();
-      document.getElementById('dlgStatus').textContent = '';
+      // Num pedido, salvar aqui reescreve só a versão completa — a guia e o
+      // relatório separados nascem do formulário, então é lá que se muda.
+      document.getElementById('dlgStatus').textContent = ehPedido
+        ? 'Isto é um pedido de cirurgia: para mudar os dados use "Refazer no formulário" (aqui você só ajusta o texto da versão completa).'
+        : '';
     } catch (e) {
       btnToggle.style.display = 'none';
       const data = await api('/documentos/api/' + nome + '/content');
@@ -986,14 +1014,21 @@ document.getElementById('btnDelete').addEventListener('click', async () => {
   document.getElementById('dlgEdit').close();
   load();
 });
-document.getElementById('btnSendGroup').addEventListener('click', async () => {
+// Pedido de cirurgia tem duas peças com destinos diferentes (a guia é o
+// formulário da operadora; o relatório é o anexo que justifica), então dá
+// pra mandar cada uma sozinha — o portal costuma pedir um arquivo por peça.
+async function enviarPdf(parte) {
   const st = document.getElementById('dlgStatus');
-  st.textContent = 'Gerando PDF e enviando no grupo...';
+  const nome = parte === 'guia' ? 'a guia' : (parte === 'relatorio' ? 'o relatório' : 'o PDF');
+  st.textContent = 'Gerando ' + nome + ' e enviando no grupo...';
   try {
-    await api('/documentos/api/' + editingNome + '/send-group', {method: 'POST'});
-    st.textContent = '✅ Enviado no grupo.';
+    await api('/documentos/api/' + editingNome + '/send-group' + (parte ? ('?parte=' + parte) : ''), {method: 'POST'});
+    st.textContent = '✅ Enviei ' + nome + ' no grupo.';
   } catch (e) { st.textContent = '❌ Falha ao enviar — confira se o WhatsApp está conectado.'; }
-});
+}
+document.getElementById('btnSendGroup').addEventListener('click', () => enviarPdf(''));
+document.getElementById('btnSendGuia').addEventListener('click', () => enviarPdf('guia'));
+document.getElementById('btnSendRelatorio').addEventListener('click', () => enviarPdf('relatorio'));
 
 load();
 </script>
@@ -1174,8 +1209,13 @@ class H(BaseHTTPRequestHandler):
             pasta = _safe_site_name(nome)
             if not pasta or not os.path.isdir(pasta):
                 return self._json({"error": "não encontrado"}, 404)
+            # ?parte=guia|relatorio manda so uma das pecas do pedido de cirurgia;
+            # sem parametro vai o documento inteiro, como sempre foi.
+            parte = (parse_qs(urlparse(self.path).query).get("parte") or [None])[0]
+            if parte not in (None, "guia", "relatorio"):
+                return self._json({"error": "parte inválida"}, 400)
             titulo = next((s["titulo"] for s in _list_sites() if s["nome"] == nome), nome)
-            ok, err = _send_pdf_to_group(nome, titulo)
+            ok, err = _send_pdf_to_group(nome, titulo, parte)
             if not ok:
                 return self._json({"error": err}, 502)
             return self._json({"ok": True})

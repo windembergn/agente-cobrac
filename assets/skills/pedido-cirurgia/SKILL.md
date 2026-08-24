@@ -79,9 +79,22 @@ o que ele escreveu **sempre ganha** do texto automático.
 Mande o link e uma linha curta com o que você preencheu de padrão ("já entrou o material de
 ortognática: miniplacas, 44 parafusos, placa reta, piezo e serra — se mudar algo eu ajusto").
 
-Para mandar o **PDF no grupo**:
+**São duas peças, e o mesmo preenchimento gera as duas separadas:**
+
+| Peça | Link | O que é |
+|---|---|---|
+| Guia | `/s/<nome>/guia.html` | o formulário **da operadora** (campos que ela preenche, 3 assinaturas) |
+| Relatório | `/s/<nome>/relatorio.html` | o **anexo** que justifica, assinado só pelo cirurgião |
+| As duas | `/s/<nome>` | versão combinada, para imprimir e grampear |
+
+No portal da operadora costuma-se subir **um arquivo para cada**; no balcão vão juntas. Mande o
+link da peça que ele pediu — na dúvida, mande o combinado e diga que dá para separar.
+
+Para mandar o **PDF no grupo** (sem `?parte=` vai o combinado):
 ```bash
-curl -s -u "$DASH_USER:$DASH_PASS" -X POST http://127.0.0.1:8101/documentos/api/<nome>/send-group
+curl -s -u "$DASH_USER:$DASH_PASS" -X POST "http://127.0.0.1:8101/documentos/api/<nome>/send-group?parte=guia"
+curl -s -u "$DASH_USER:$DASH_PASS" -X POST "http://127.0.0.1:8101/documentos/api/<nome>/send-group?parte=relatorio"
+curl -s -u "$DASH_USER:$DASH_PASS" -X POST "http://127.0.0.1:8101/documentos/api/<nome>/send-group"
 ```
 
 ### 4. Ajuste é regenerar, não é refazer
