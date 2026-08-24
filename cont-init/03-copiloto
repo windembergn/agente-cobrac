@@ -52,6 +52,14 @@ stt:
   provider: openai
   openai:
     model: whisper-1
+# Modo audio (/voice tts, /voice on) usa a MESMA chave da OpenAI que ja e'
+# obrigatoria para o Whisper. Sem este bloco o comando existe, o cirurgiao liga,
+# e a resposta continua saindo em texto — sem erro nenhum no grupo.
+tts:
+  enabled: true
+  provider: openai
+  openai:
+    model: tts-1
 approvals:
   mode: smart
 dashboard:
@@ -312,6 +320,26 @@ fi
 # dele, gera a URL com user_id e escreve o bloco mcp_servers no config.yaml.
 # Sem a chave, remove a entrada. Nunca derruba o boot (sai 0 sempre).
 /opt/hermes/.venv/bin/python /opt/copiloto/composio-setup.py || true
+
+# TTS — acrescentado ao config VIVO quando faltar. O bloco acima so vale para
+# quem instala agora; instalacao que ja existia tem config.yaml proprio (ele nao
+# e' sobrescrito, e' do cirurgiao) e continuaria com /voice tts mudo. So
+# ACRESCENTA se a chave nao existir — quem ja configurou TTS na mao fica como esta.
+/opt/hermes/.venv/bin/python - "$CFG" <<'PY' || true
+import sys, yaml
+caminho = sys.argv[1]
+try:
+    with open(caminho, encoding="utf-8") as f:
+        cfg = yaml.safe_load(f) or {}
+except OSError:
+    sys.exit(0)
+if "tts" in cfg:
+    sys.exit(0)
+cfg["tts"] = {"enabled": True, "provider": "openai", "openai": {"model": "tts-1"}}
+with open(caminho, "w", encoding="utf-8") as f:
+    yaml.safe_dump(cfg, f, allow_unicode=True, sort_keys=False)
+print("[tts] bloco acrescentado ao config.yaml")
+PY
 
 # Cerebro — reconciliado a CADA boot, como o Composio: o config.yaml so nasce
 # no primeiro boot, entao sem isto quem ja tinha instalacao no ar colaria a
