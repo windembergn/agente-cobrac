@@ -1353,8 +1353,54 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
 
 
+AVISO_UPDATE = os.path.join(DATA_DIR, ".copiloto_avisar_update")
+
+
+def _avisar_volta_do_update():
+    """Depois de um /update, avisa no grupo que o sistema voltou.
+
+    Quem pediu o update recebe "estou atualizando" e o container morre logo em
+    seguida — sem este aviso o cirurgiao fica olhando pro zap sem saber se
+    voltou. Roda aqui (e nao no cont-init) porque so da pra avisar quando o
+    bridge do WhatsApp ja estiver conectado, o que leva alguns segundos a mais
+    do que o boot.
+    """
+    try:
+        with open(AVISO_UPDATE, encoding="utf-8") as f:
+            pedido = json.load(f)
+    except (OSError, ValueError):
+        return
+    chat_id = (pedido.get("chat_id") or "").strip() or _home_channel_chat_id()
+    # A bandeira sai ANTES de tentar mandar: se o envio falhar, e' melhor perder
+    # o aviso do que reenviar "voltei" em todo boot pelo resto da instalacao.
+    try:
+        os.unlink(AVISO_UPDATE)
+    except OSError:
+        pass
+    if not chat_id:
+        return
+    # O bridge sobe depois de nos; espera ele aceitar mensagem (ate ~3 min).
+    for _ in range(90):
+        time.sleep(2)
+        try:
+            body = json.dumps({
+                "chatId": chat_id,
+                "message": "✅ Pronto, já estou de volta com a versão nova.",
+            }).encode()
+            req = urllib.request.Request(
+                BRIDGE_SEND_URL, data=body,
+                headers={"Content-Type": "application/json"}, method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                if json.loads(resp.read() or b"{}").get("success"):
+                    return
+        except Exception:
+            continue
+
+
 if __name__ == "__main__":
     _init_db()
     threading.Thread(target=_intake_loop, daemon=True).start()
+    threading.Thread(target=_avisar_volta_do_update, daemon=True).start()
     print(f"[crm] listening on 127.0.0.1:{PORT}", file=sys.stderr)
     ThreadingHTTPServer(("0.0.0.0", PORT), H).serve_forever()

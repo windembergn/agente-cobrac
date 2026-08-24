@@ -89,6 +89,8 @@ Além de escrever documento, eu também:
    me manda a semana": eu deixo rodando sozinho e te aviso aqui.
 🌐 *Páginas no ar* — orientação pro paciente, página de captação, currículo: eu escrevo,
    publico e te mando o link pronto.
+🖼️ *Imagens* — crio ilustração pra página do zero, e edito foto que você mandar
+   (trocar/desfocar fundo, deixar o retrato profissional).
 ```
 
 ### 6. Lista os comandos, todos, com o que cada um faz
@@ -103,6 +105,7 @@ Meus comandos:
 • /voice tts — passo a responder SEMPRE por áudio
 • /voice off — volto a responder só em texto
 • /apresentacao — essa demonstração que você acabou de ver
+• /update — atualizo o sistema pra versão nova (só o dono, no grupo principal)
 
 *Comigo, em conversa normal (não são comando, é só pedir):*
 • "faz o pedido de cirurgia do [paciente]" — monto a guia do convênio + a justificativa
@@ -111,6 +114,8 @@ Meus comandos:
 • "marca [compromisso]" / "o que eu tenho essa semana" — sua agenda e suas pendências
 • "o que diz a literatura sobre [tema]" — busco no PubMed e resumo com as referências
 • "toda sexta [tarefa]" — deixo rodando sozinho e te aviso aqui
+• "gera uma imagem de [o que for]" — crio a imagem do zero
+• "melhora essa foto" / "tira esse fundo" (mandando a foto) — edito a imagem
 • "publica uma página sobre [assunto]" — crio e já deixo no ar, com link pronto
 • "descreve essa cirurgia" (mandando áudio) — transformo sua fala em descrição organizada
 • "ajusta [o que quiser mudar em mim]" — eu mesmo me configuro (guardo cópia de segurança

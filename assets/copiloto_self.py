@@ -14,6 +14,7 @@ Verbos:
   site remover <nome>     tira do ar (guarda copia antes)
 
   servidor           mostra se o acesso ao servidor (SSH) esta funcionando
+  atualizar          puxa a versao nova da imagem e reinicia o servico (o /update do zap)
 
   cerebro                 qual cerebro esta em uso agora
   cerebro claude|gpt      troca o cerebro (claude|opus|sonnet|gpt|auto) e reinicia
@@ -630,6 +631,108 @@ def cmd_servidor():
     _ok("acesso ao servidor OK — %s" % " ".join(r.stdout.split()))
 
 
+
+IMAGEM = os.environ.get(
+    "COPILOTO_IMAGEM", "ghcr.io/windembergn/copiloto-cirurgiao"
+)
+AVISO_UPDATE = DATA / ".copiloto_avisar_update"
+# Segundos entre responder "estou atualizando" e o servico realmente reiniciar.
+# O quick_command devolve a resposta e SO DEPOIS o gateway a entrega no zap; se
+# o container morrer nesse meio, o cirurgiao fica sem nenhum retorno e acha que
+# o comando nao funcionou.
+ATRASO_UPDATE_S = 8
+
+
+def _ssh(comando, timeout=25):
+    """Roda um comando na maquina hospedeira. Devolve (ok, saida)."""
+    r = subprocess.run(
+        ["ssh", "-F", str(SSH_DIR / "config"), "-o", "BatchMode=yes",
+         "-o", "ConnectTimeout=8", "vps", comando],
+        capture_output=True, text=True, timeout=timeout,
+    )
+    return r.returncode == 0, (r.stdout or r.stderr or "").strip()
+
+
+def _servico_do_copiloto():
+    """Descobre o nome do servico Swarm deste copiloto.
+
+    O nome da stack muda a cada instalacao (o cirurgiao escolhe no Portainer),
+    entao nao da pra fixar: procuramos pela IMAGEM, que e' sempre a nossa.
+    """
+    ok, saida = _ssh("docker service ls --format '{{.Name}}|{{.Image}}'")
+    if not ok:
+        return None, saida
+    for linha in saida.splitlines():
+        if "|" not in linha:
+            continue
+        nome, imagem = linha.split("|", 1)
+        if imagem.strip().startswith(IMAGEM):
+            return nome.strip(), ""
+    return None, "nenhum servico rodando a imagem do copiloto"
+
+
+def cmd_atualizar():
+    """/update no grupo: puxa a versao nova da imagem e reinicia o servico.
+
+    Fica aqui (e nao numa habilidade) porque nao pode depender do agente: se uma
+    versao quebrar o cerebro, o /update ainda tem que funcionar. E' um
+    quick_command do tipo exec — roda sem LLM, direto.
+    """
+    exige_grupo_principal("atualizar")
+
+    if not SSH_KEY.exists():
+        _erro(
+            "o acesso ao servidor nao esta ligado nesta instalacao, entao eu nao "
+            "consigo me atualizar sozinho.",
+            "Diga que a atualizacao precisa ser feita pelo painel (botao Update na "
+            "stack), ou que a stack precisa de COPILOTO_HOST_SSH=on e do volume "
+            "/root/.ssh.",
+        )
+
+    servico, motivo = _servico_do_copiloto()
+    if not servico:
+        _erro(
+            "nao encontrei o meu proprio servico no servidor (%s)." % motivo,
+            "Diga que a atualizacao precisa ser feita pelo painel desta vez.",
+        )
+
+    # Guarda de onde veio o pedido, para avisar no mesmo grupo quando voltar.
+    try:
+        t = json.loads(TURNO.read_text(encoding="utf-8"))
+        AVISO_UPDATE.write_text(
+            json.dumps({"chat_id": t.get("chat_id", ""), "ts": time.time()}),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+
+    # Dispara SOLTO no host: o proprio container morre no meio da atualizacao,
+    # entao o comando nao pode depender desta sessao de SSH continuar viva.
+    #
+    # `--image <tag>` e' o que puxa a versao nova: o Swarm re-resolve a tag no
+    # registro e pega o digest novo (por isso existe --no-resolve-image, para
+    # DESLIGAR esse comportamento). Nada de "--resolve-image always" aqui: essa
+    # flag e' do `docker stack deploy`, nao do `service update`, e o comando
+    # morre com erro de uso sem atualizar nada.
+    disparo = (
+        "nohup sh -c 'sleep %d; docker service update --force "
+        "--image %s:latest %s' >/tmp/copiloto-update.log 2>&1 &"
+    ) % (ATRASO_UPDATE_S, IMAGEM, servico)
+    ok, saida = _ssh(disparo, timeout=20)
+    if not ok:
+        AVISO_UPDATE.unlink(missing_ok=True)
+        _erro(
+            "nao consegui disparar a atualizacao (%s)." % saida[:200],
+            "Diga que desta vez a atualizacao precisa ser feita pelo painel.",
+        )
+
+    print(
+        "🔄 Baixando a versão nova e reiniciando — fico fora do ar por cerca de "
+        "um minuto e volto sozinho.\n"
+        "O WhatsApp continua conectado: você não vai precisar ler QR de novo."
+    )
+    sys.exit(0)
+
 USO = __doc__
 
 
@@ -661,6 +764,8 @@ def main():
         cmd_servidor()
     elif v in ("cerebro", "modelo", "cabeca"):
         cmd_cerebro(positivos)
+    elif v in ("atualizar", "update", "atualizacao"):
+        cmd_atualizar()
     else:
         print(USO)
         sys.exit(2)

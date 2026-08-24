@@ -119,6 +119,19 @@ agent:
 cron:
   wrap_response: false
 
+# /update no grupo — atualiza o sistema sem o cirurgiao abrir o Portainer.
+# type: exec roda DIRETO, sem passar pelo agente: nao gasta LLM, nao depende de
+# o cerebro estar bom, e responde igual mesmo se a versao anterior tiver
+# quebrado alguma coisa. Quem pode chamar e' decidido dentro do script (so o
+# dono, so no grupo principal, marcador de turno fresco).
+quick_commands:
+  update:
+    type: exec
+    command: /opt/data/copiloto atualizar
+  atualizar:
+    type: alias
+    target: update
+
 # Geracao e edicao de imagem com a MESMA chave da OpenAI que ja e' obrigatoria.
 # O Hermes exige provedor explicito de proposito ("possuir uma chave de nuvem
 # nao pode inscrever ninguem num backend pago sem pedir") — por isso a
@@ -387,6 +400,16 @@ if not isinstance(agente, dict):
 if "gateway_notify_interval" not in agente:
     agente["gateway_notify_interval"] = 60
     mudou.append("gateway_notify_interval")
+
+# --- /update no grupo ---
+quick = cfg.get("quick_commands")
+if not isinstance(quick, dict):
+    quick = {}
+    cfg["quick_commands"] = quick
+if "update" not in quick:
+    quick["update"] = {"type": "exec", "command": "/opt/data/copiloto atualizar"}
+    quick["atualizar"] = {"type": "alias", "target": "update"}
+    mudou.append("/update")
 
 # --- Mensagem intermediaria (nivel GLOBAL) ---
 # O bloco por plataforma (display.platforms.whatsapp) NAO se resolve aqui: quem
