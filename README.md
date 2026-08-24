@@ -22,9 +22,12 @@ No primeiro boot, um script de `cont-init` gera toda a configuração a partir d
 | **from-me** | responde inclusive quando o próprio dono escreve no grupo |
 | **Só um grupo** | ativado pelo comando `/main`; nunca responde em conversa privada nem em outros grupos |
 | **QR num link fixo** | página `/whatsapp` (protegida pela senha do painel) com QR que se atualiza e avisa "Conectado com sucesso" |
-| **Modo apresentação** | `/apresentacao` no grupo manda o link da vitrine (`/s/agente-cobrac`) e um exemplo de documento (`/s/exemplo-documento`), já publicados de fábrica |
+| **Modo apresentação** | `/apresentacao` no grupo manda os PDFs de exemplo (guia de convênio e documento clínico), os links das telas e a lista completa de capacidades e comandos |
 | **Mini-CRM** | funil visual em `/crm` — Novo Lead → Atendimento → Agendou → Compareceu → Exames → Cirurgia → Finalizado, com mensagem automática (editável) por etapa |
 | **Gerenciador de documentos** | `/documentos` — lista tudo publicado em `/s`, edita o conteúdo, exclui (com cópia de segurança) e manda o PDF direto no grupo principal |
+| **Pedido de cirurgia** | `/crm/pedido` — o cirurgião clica (tipo de cirurgia → má oclusão → associados → convênio → hospital → exames → fornecedor → material → qtd → data) e sai a **guia de solicitação de internação** (padrão TISS) + o relatório de justificativa. O mesmo motor atende o WhatsApp pela habilidade `pedido-cirurgia` |
+| **Habilidades semeadas** | `pedido-cirurgia`, `recurso-glosa` (analisa negativa, monta o recurso e aprende o padrão da operadora), `protocolos` (os protocolos do próprio cirurgião), `rotina-agenda`, `pesquisa-cientifica` (PubMed pela API do NCBI), `automacoes` (ferramenta `cronjob`), `publicar-site`, `apresentacao` — atualizadas a cada boot pela imagem |
+| **Modo áudio** | `/voice tts` responde por áudio, `/voice on` é voz-a-voz, `/voice off` volta ao texto (precisa de TTS configurado) |
 
 ---
 
@@ -56,7 +59,7 @@ As demais (`HERMES_DASHBOARD`, `WHATSAPP_MODE=bot`, `WHATSAPP_ENABLED`, `WHATSAP
 A stack expõe três caminhos no mesmo domínio (veja `docker-compose.yml`):
 - `/` → painel do agente (porta 9119)
 - `/whatsapp` e `/s` → página de QR e sites publicados (porta 8099), com **prioridade maior** para não cair no painel
-- `/crm` → mini-CRM (porta 8101), mesma senha do painel, também com prioridade maior
+- `/crm` e `/documentos` → mini-CRM, pedido de cirurgia (`/crm/pedido`) e gerenciador de documentos (porta 8101), mesma senha do painel, também com prioridade maior
 
 ---
 
