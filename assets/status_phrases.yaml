@@ -1,0 +1,71 @@
+# Frases de "ainda estou trabalhando" — PT-BR, tom de secretario clinico.
+#
+# Sem isto o Hermes manda "⏳ Working — 3 min — running: terminal" no grupo do
+# cirurgiao: ingles e nome de ferramenta, as duas coisas proibidas pela persona.
+# Com `long_running_notifications: generic` o gateway sorteia daqui, evitando
+# repetir a ultima usada.
+#
+# Duas categorias, e so' essas duas existem (gateway/status_phrases.py:
+# classify_status_context): "status" = o heartbeat de tarefa longa;
+# "generic" = o resto do chatter de status.
+#
+# Regra ao editar: frase curta, humana, sem jargao, sem prometer prazo. Ela
+# aparece SOZINHA no grupo, no meio de uma tarefa demorada.
+
+# `replace` troca o catalogo em ingles em vez de somar ao dele — sem isto o
+# sorteio cairia em "still on it" metade das vezes.
+mode: replace
+
+status:
+- ainda estou nisso
+- continuo trabalhando aqui
+- essa parte demora um pouco, mas está andando
+- ainda montando
+- não travei, ainda estou processando
+- ainda estou conferindo
+- seguindo com a tarefa
+- está indo, só demora mesmo
+- ainda trabalhando nisso
+- deixando terminar direitinho
+- continuo aqui, quase lá
+- ainda processando
+- essa etapa é mais lenta, mas está rodando
+- ainda organizando as coisas
+- ainda estou aqui, trabalhando
+- mais um pouquinho
+- ainda finalizando
+- continuo com você, só terminando
+- essa aqui pede um minuto a mais
+- ainda escrevendo
+- está caminhando, não parei
+- ainda ajustando
+- quase terminando
+- ainda montando o resultado
+- seguindo, sem problema nenhum
+- ainda revisando antes de te entregar
+- ainda no meio da tarefa
+- está demorando um pouco mais que o normal, mas está indo
+- continuo trabalhando, já te aviso
+- terminando de conferir
+
+generic:
+- já estou nisso
+- um instante
+- estou vendo isso agora
+- me dá um segundo
+- estou olhando
+- trabalhando nisso
+- conferindo
+- ainda trabalhando
+- um momento
+- dando uma olhada
+- recebi, já estou vendo
+- só um instante
+- olhando agora
+- resolvendo aqui
+- conferindo os detalhes
+- um segundo, estou nisso
+- olhando com calma
+- organizando aqui
+- já vejo isso
+- ainda olhando

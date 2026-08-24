@@ -35,15 +35,30 @@ BASE_PORT = int(os.environ.get("COPILOTO_BASE_PORT", "3000"))
 HERMES_UID = int(os.environ.get("HERMES_UID", "1000"))
 HERMES_GID = int(os.environ.get("HERMES_GID", "1000"))
 
-# Silencio no WhatsApp: sem "pensamento", sem transcricao, sem aviso de
-# sistema. Replicado para CADA plataforma de slot — sem isso o segundo
-# numero voltaria a despejar no grupo tudo que o primeiro ja nao mostra.
+# Como o copiloto se mostra no WhatsApp. Replicado para CADA plataforma de slot
+# a cada boot — sem isso o segundo numero se comportaria diferente do primeiro.
+#
+# ATENCAO: este dicionario GANHA do que estiver no config.yaml (a linha
+# `display[p] = dict(DISPLAY_QUIET)` sobrescreve o bloco inteiro). Se um ajuste
+# de exibicao precisar valer, ele tem que estar AQUI — mudar so o config de
+# fabrica no cont-init nao adianta, o slots desfaz no mesmo boot.
+#
+# Silencio segue valendo para o maquinario (pensamento, ferramenta, status de
+# sistema). O que NAO e' silencio: avisar que recebeu e que ainda esta
+# trabalhando — silencio de minutos, para quem esta no corredor do hospital,
+# parece copiloto morto.
 DISPLAY_QUIET = {
     "tool_progress": "off",
     "show_reasoning": False,
-    "interim_assistant_messages": False,
-    "long_running_notifications": False,
+    # Deixa passar o "recebi, ja estou nisso" que a persona manda mandar antes
+    # de comecar uma tarefa demorada.
+    "interim_assistant_messages": True,
+    # 'generic' e nao True: em True o gateway manda "⏳ Working — 3 min —
+    # running: terminal" (ingles + nome de ferramenta). Em generic ele sorteia
+    # do nosso catalogo PT-BR em /opt/data/status_phrases.yaml.
+    "long_running_notifications": "generic",
     "busy_steer_ack_enabled": False,
+    # Sem isto o aviso sai com "iteration 7/40" colado.
     "busy_ack_detail": False,
     "memory_notifications": "off",
 }

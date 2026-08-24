@@ -79,7 +79,12 @@ platforms:
 display:
   tool_progress: 'off'
   show_reasoning: false
-  interim_assistant_messages: false
+  # Mensagem intermediaria LIGADA: e' o que faz o "recebi, ja estou nisso"
+  # chegar na hora, antes de o agente comecar a trabalhar. Sem isto a primeira
+  # coisa que o cirurgiao ve e' a resposta final, minutos depois, e ele acha
+  # que o copiloto morreu. A persona (SOUL) manda usar isso com parcimonia:
+  # uma linha curta e humana, nunca narrar ferramenta ou caminho de arquivo.
+  interim_assistant_messages: true
   memory_notifications: 'off'
   credits_notices: false
   turn_completion_explainer: false
@@ -94,15 +99,36 @@ display:
     whatsapp:
       tool_progress: 'off'
       show_reasoning: false
-      interim_assistant_messages: false
-      long_running_notifications: false
+      interim_assistant_messages: true
+      # 'generic' (nao true) de proposito: em true o gateway manda
+      # "⏳ Working — 3 min — running: terminal" — ingles e nome de ferramenta,
+      # as duas coisas que a persona proibe. Em generic ele sorteia uma frase
+      # do catalogo, e o nosso catalogo e' PT-BR (status_phrases.yaml).
+      long_running_notifications: generic
       busy_steer_ack_enabled: false
+      # Sem isto o heartbeat sai com "iteration 7/40" colado na frase.
       busy_ack_detail: false
       memory_notifications: 'off'
 compression:
   threshold: 0.7
+agent:
+  # De quanto em quanto tempo ele avisa que ainda esta trabalhando, numa tarefa
+  # demorada (padrao do Hermes: 180s). O cirurgiao pediu 1 minuto: numa pagina
+  # que leva 4 minutos, silencio de 3 parece travamento.
+  gateway_notify_interval: 60
 cron:
   wrap_response: false
+
+# Geracao e edicao de imagem com a MESMA chave da OpenAI que ja e' obrigatoria.
+# O Hermes exige provedor explicito de proposito ("possuir uma chave de nuvem
+# nao pode inscrever ninguem num backend pago sem pedir") — por isso a
+# ferramenta some quando isto falta, e o agente responde "nao tenho chave de
+# geracao de imagem" mesmo com a chave da OpenAI na stack. gpt-image-2 faz
+# texto->imagem E edicao de foto (ate 16 imagens de origem).
+image_gen:
+  provider: openai
+  openai:
+    model: gpt-image-2-medium
 
 # Dicas de primeira vez ("First-time tip — ... /busy queue ...") ja marcadas como
 # vistas: sao one-time, mas a primeira apareceria no grupo do cirurgiao.
@@ -321,25 +347,70 @@ fi
 # Sem a chave, remove a entrada. Nunca derruba o boot (sai 0 sempre).
 /opt/hermes/.venv/bin/python /opt/copiloto/composio-setup.py || true
 
-# TTS — acrescentado ao config VIVO quando faltar. O bloco acima so vale para
-# quem instala agora; instalacao que ja existia tem config.yaml proprio (ele nao
-# e' sobrescrito, e' do cirurgiao) e continuaria com /voice tts mudo. So
-# ACRESCENTA se a chave nao existir — quem ja configurou TTS na mao fica como esta.
+# RECURSOS NOVOS no config VIVO — acrescentados quando faltarem.
+#
+# O bloco de fabrica acima so vale para quem instala AGORA; instalacao que ja
+# existia tem config.yaml proprio (ele nao e' sobrescrito de proposito, e' do
+# cirurgiao) e ficaria para sempre sem o recurso novo. Aqui cada item so' e'
+# ACRESCENTADO se ainda nao existir — quem configurou na mao fica como esta.
+#
+# Cuidado ao editar: nada aqui pode SOBRESCREVER escolha do usuario. Se um dia
+# precisar mudar um valor ja existente, faca disso uma decisao explicita e
+# documente o motivo, senao o proximo Update desfaz o que ele pediu no grupo.
 /opt/hermes/.venv/bin/python - "$CFG" <<'PY' || true
 import sys, yaml
+
 caminho = sys.argv[1]
 try:
     with open(caminho, encoding="utf-8") as f:
         cfg = yaml.safe_load(f) or {}
 except OSError:
     sys.exit(0)
-if "tts" in cfg:
-    sys.exit(0)
-cfg["tts"] = {"enabled": True, "provider": "openai", "openai": {"model": "tts-1"}}
-with open(caminho, "w", encoding="utf-8") as f:
-    yaml.safe_dump(cfg, f, allow_unicode=True, sort_keys=False)
-print("[tts] bloco acrescentado ao config.yaml")
+
+mudou = []
+
+# --- Modo audio (/voice tts) ---
+if "tts" not in cfg:
+    cfg["tts"] = {"enabled": True, "provider": "openai", "openai": {"model": "tts-1"}}
+    mudou.append("tts")
+
+# --- Geracao e edicao de imagem (gpt-image-2, mesma chave da OpenAI) ---
+if "image_gen" not in cfg:
+    cfg["image_gen"] = {"provider": "openai", "openai": {"model": "gpt-image-2-medium"}}
+    mudou.append("image_gen")
+
+# --- Aviso de "ainda estou trabalhando" a cada 1 minuto ---
+agente = cfg.get("agent")
+if not isinstance(agente, dict):
+    agente = {}
+    cfg["agent"] = agente
+if "gateway_notify_interval" not in agente:
+    agente["gateway_notify_interval"] = 60
+    mudou.append("gateway_notify_interval")
+
+# --- Mensagem intermediaria (nivel GLOBAL) ---
+# O bloco por plataforma (display.platforms.whatsapp) NAO se resolve aqui: quem
+# manda nele e' o DISPLAY_QUIET do copiloto_slots.py, que roda depois neste
+# mesmo boot e sobrescreve o bloco inteiro, em todos os numeros. Mexer aqui
+# seria escrever para o vento. Aqui fica so' o global, que o slots nao toca.
+display = cfg.get("display")
+if not isinstance(display, dict):
+    display = {}
+    cfg["display"] = display
+if display.get("interim_assistant_messages") is not True:
+    display["interim_assistant_messages"] = True
+    mudou.append("avisos")
+
+if mudou:
+    with open(caminho, "w", encoding="utf-8") as f:
+        yaml.safe_dump(cfg, f, allow_unicode=True, sort_keys=False)
+    print("[config] acrescentado: " + ", ".join(mudou))
 PY
+
+# Frases de "ainda trabalhando" em PT-BR — NOSSAS, sobrescritas a cada boot
+# (mesma regra do CLAUDE.md e do _kit). Sem este arquivo o heartbeat sai em
+# ingles, com nome de ferramenta junto.
+[ -f /opt/copiloto/status_phrases.yaml ] && cp /opt/copiloto/status_phrases.yaml "$DATA/status_phrases.yaml" || true
 
 # Cerebro — reconciliado a CADA boot, como o Composio: o config.yaml so nasce
 # no primeiro boot, entao sem isto quem ja tinha instalacao no ar colaria a

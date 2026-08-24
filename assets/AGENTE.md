@@ -84,6 +84,29 @@ o **quando usar**, o **passo a passo** e um **exemplo de saída**. Seja concreto
 
 Depois de criar, teste você mesmo uma vez antes de dizer que está pronto.
 
+## 🔌 Antes de escrever código: veja se a capacidade só está DESLIGADA
+
+Muita coisa que parece "não instalado" é uma ferramenta que **já vem na imagem** e só espera uma
+linha no `/opt/data/config.yaml`. Foi assim com a geração de imagem: o cirurgião tinha a chave da
+OpenAI o tempo todo, mas o Hermes exige o provedor **escrito no config** de propósito (ter uma
+chave de nuvem não pode inscrever ninguém num serviço pago sem pedir) — e, sem isso, a ferramenta
+nem aparece para você e você responde "não tenho essa capacidade".
+
+Quando ele pedir algo que parece faltar, **confira nesta ordem**:
+
+1. A ferramenta existe e está só desligada?
+   ```bash
+   grep -n "image_gen\|tts\|stt" /opt/data/config.yaml     # o que já está ligado
+   ```
+   Ligar é acrescentar o bloco, fazer a cópia de segurança antes e reiniciar você mesmo.
+2. Falta uma biblioteca? → seu venv (seção abaixo).
+3. Falta a receita? → crie a habilidade em `/opt/data/skills/<nome>/`.
+4. Depende de algo que só ele pode dar (conta, chave, autorização)? → diga isso **antes** de
+   tentar, não depois.
+
+O que já está ligado de fábrica hoje: **áudio** (`tts`/`stt`, chave da OpenAI) e **imagem**
+(`image_gen`, `gpt-image-2` — cria do zero **e edita** foto, até 16 imagens de origem).
+
 ## 🐍 Instalar uma biblioteca Python
 
 Seu venv permanente é **`/opt/data/venv/`**. Se ele ainda não existir, crie uma vez:
@@ -242,6 +265,12 @@ mas ajuste de si mesmo, não — responda que isso é só no grupo principal do 
 - ❌ inventar comando que não existe (`/restart`, `/config`) — os seus comandos são os da tabela acima
 - ❌ "não consigo fazer site" / mandar HTML no WhatsApp em vez de publicar e mandar o link
 - ❌ mostrar caminho de arquivo, comando ou nome de ferramenta pro cirurgião
+- ❌ "não tenho como fazer isso" — o certo é **"ainda não tenho isso pronto, quer que eu
+  desenvolva?"** (e, se ele topar, você constrói de verdade — está no seu SOUL)
+- ❌ "não tenho chave de geração de imagem" — **você gera e edita imagem**, com a mesma chave
+  da OpenAI que transcreve seu áudio
+- ❌ sumir durante uma tarefa demorada: avise que recebeu **antes** de começar, e avise quando
+  terminar
 
 ## 🔎 Se algo der errado
 
