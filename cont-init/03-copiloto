@@ -200,29 +200,71 @@ if [ -d /opt/copiloto/site_kit ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 3c) MODO APRESENTACAO — vitrine + exemplo de documento, so no PRIMEIRO boot
+# 3c) HABILIDADES NOSSAS — atualizadas a CADA boot, como o _kit e o CLAUDE.md
 #
-# Diferente do _kit acima: essas paginas viram conteudo DO CIRURGIAO assim que
-# instala (ele pode trocar nome, foto, cor). Por isso nao sobrescrevemos a cada
-# boot — so semeamos se ainda nao existir, pra nao apagar customizacao.
+# pedido-cirurgia, recurso-glosa, protocolos, rotina-agenda, pesquisa-cientifica,
+# automacoes, apresentacao. Sao DOCUMENTACAO NOSSA, nao personalizacao do
+# cirurgiao: se a instrucao estiver errada (ou faltando), a correcao tem que
+# chegar pela imagem — foi por isso que a apresentacao, semeada so no primeiro
+# boot, ficou congelada numa versao antiga em quem ja tinha instalado.
+#
+# O que o cirurgiao personaliza de verdade e' o SOUL e as skills que o AGENTE
+# cria (essas ficam intocadas — nao estao aqui).
 # ---------------------------------------------------------------------------
-if [ -d /opt/copiloto/sites_padrao ]; then
-  for nome in agente-cobrac exemplo-documento; do
-    if [ -d "/opt/copiloto/sites_padrao/$nome" ] && [ ! -d "$DATA/sites/$nome" ]; then
-      mkdir -p "$DATA/sites/$nome"
-      cp -r "/opt/copiloto/sites_padrao/$nome/." "$DATA/sites/$nome/" 2>/dev/null || true
-    fi
+if [ -d /opt/copiloto/skills ]; then
+  for d in /opt/copiloto/skills/*/; do
+    [ -d "$d" ] || continue
+    nome=$(basename "$d")
+    mkdir -p "$DATA/skills/$nome"
+    cp -r "$d." "$DATA/skills/$nome/" 2>/dev/null || true
+    # Vem pronta da imagem, nao foi o agente que criou: sem esta linha o
+    # "restaurar original" a trataria como criacao do agente e apagaria.
+    grep -qx "$nome" "$FAB/skills_originais.txt" 2>/dev/null || echo "$nome" >> "$FAB/skills_originais.txt"
   done
 fi
-if [ -d /opt/copiloto/apresentacao ] && [ ! -d "$DATA/skills/apresentacao" ]; then
-  mkdir -p "$DATA/skills/apresentacao"
-  cp /opt/copiloto/apresentacao/SKILL.md "$DATA/skills/apresentacao/SKILL.md" 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# 3d) PAGINAS DE EXEMPLO — vitrine, documento clinico e guia de convenio
+#
+# Diferente das skills: essas paginas viram conteudo DO CIRURGIAO assim que ele
+# instala (troca nome, foto, cor). Entao a regra e' a mesma da persona: se a
+# pagina viva for IDENTICA a de fabrica (ninguem editou), atualiza; se ele
+# mexeu, nao encosta. Sem isso, uma instalacao antiga nunca receberia a vitrine
+# nova nem o exemplo de guia que a apresentacao manda.
+# ---------------------------------------------------------------------------
+if [ -d /opt/copiloto/sites_padrao ]; then
+  mkdir -p "$FAB/sites_padrao"
+  for nome in agente-cobrac exemplo-documento exemplo-solicitacao-convenio; do
+    ORIG="/opt/copiloto/sites_padrao/$nome"
+    [ -d "$ORIG" ] || continue
+    VIVO="$DATA/sites/$nome"
+    BASE="$FAB/sites_padrao/$nome"
+    if [ ! -d "$VIVO" ]; then
+      mkdir -p "$VIVO"
+      cp -r "$ORIG/." "$VIVO/" 2>/dev/null || true
+    elif [ -f "$BASE/index.html" ]; then
+      # Ha linha de base: so atualiza se a pagina viva for identica a ela
+      # (ninguem editou). Se o cirurgiao mexeu, nao encosta.
+      if cmp -s "$VIVO/index.html" "$BASE/index.html"; then
+        cp -r "$ORIG/." "$VIVO/" 2>/dev/null || true
+      fi
+    else
+      # Instalacao anterior a existencia desta linha de base: nao da pra saber
+      # se foi editada. Mesma decisao que foi tomada para a persona — atualiza,
+      # mas guarda a anterior, para o cirurgiao poder voltar. Sem isto, quem ja
+      # tinha instalado ficaria PARA SEMPRE com a vitrine antiga: o baseline
+      # nasceria igual a imagem nova e nunca mais bateria com a pagina viva.
+      B="$DATA/copiloto-backups/$(date +%Y%m%d-%H%M%S)-site-$nome-anterior"
+      mkdir -p "$B"
+      cp -r "$VIVO/." "$B/" 2>/dev/null || true
+      echo "pagina anterior, guardada ao atualizar o sistema" > "$B/motivo.txt"
+      cp -r "$ORIG/." "$VIVO/" 2>/dev/null || true
+    fi
+    rm -rf "$BASE"
+    mkdir -p "$BASE"
+    cp -r "$ORIG/." "$BASE/" 2>/dev/null || true
+  done
 fi
-# Essas paginas e a skill vem prontas da imagem, nao foi o agente que criou: sem
-# isto o "restaurar original" as trataria como criacao do agente e apagaria.
-for nome in apresentacao; do
-  grep -qx "$nome" "$FAB/skills_originais.txt" 2>/dev/null || echo "$nome" >> "$FAB/skills_originais.txt"
-done
 
 # Atalho que o agente usa: /opt/data/copiloto <verbo>
 cat > "$DATA/copiloto" <<'SH'

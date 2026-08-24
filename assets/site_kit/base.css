@@ -672,3 +672,63 @@ h1 .destaque, h2 .destaque { display: inline; }
   .marca { font-size: var(--step-0); }
   .marca img { height: 30px; }
 }
+
+/* ==========================================================================
+   GUIA DE SOLICITACAO (padrao TISS) — usada pelo pedido de cirurgia.
+   E' um formulario oficial: campo numerado, borda visivel e linha para
+   preencher a mao o que a operadora preenche depois (senha, autorizacao).
+   NAO e' "estilo de site": e' documento, tem que sair igual no papel.
+   ========================================================================== */
+.guia { font-size: var(--step--1); }
+.guia table { width: 100%; border-collapse: collapse; margin-bottom: -1px; table-layout: fixed; }
+.guia td, .guia th {
+  border: 1px solid var(--line-strong);
+  padding: .3rem .45rem;
+  vertical-align: top;
+  text-align: left;
+  word-wrap: break-word;
+}
+.guia .campo-num {
+  display: block; font-size: .68em; line-height: 1.3; letter-spacing: .03em;
+  text-transform: uppercase; color: var(--ink-muted);
+}
+.guia .campo-valor { display: block; font-weight: 550; min-height: 1.35em; padding-top: .1rem; }
+.guia .linha-vazia { display: block; border-bottom: 1px dotted var(--line-strong); min-height: 1.1em; }
+.guia .titulo-bloco {
+  background: var(--surface-2); border: 1px solid var(--line-strong); border-bottom: 0;
+  margin: var(--sp-4) 0 0; padding: .3rem .45rem; max-width: none;
+  font-size: .82em; font-weight: 650; text-transform: uppercase; letter-spacing: .04em;
+}
+.guia .guia-topo .operadora { font-family: var(--font-display); font-size: var(--step-1); font-weight: 600; width: 26%; }
+.guia .guia-topo .titulo-guia { text-align: center; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; }
+.guia table.itens th {
+  background: var(--surface-2); font-size: .62em; text-transform: uppercase;
+  letter-spacing: .03em; color: var(--ink-muted); font-weight: 650;
+  line-height: 1.25; word-break: break-word;
+}
+.guia table.itens td { font-weight: 550; }
+.guia table.itens .num { width: 2rem; color: var(--ink-muted); font-weight: 400; }
+.guia table.itens .cod { width: 6rem; }
+.guia table.itens .qtd { width: 5.2rem; text-align: center; }
+/* Fabricante estreito demais empurrava a DESCRICAO do procedimento para tres
+   linhas — e a descricao e' o que o auditor le. */
+.guia table.itens .forn { width: 10.5rem; font-size: .85em; font-weight: 400; line-height: 1.35; }
+.guia .assinaturas td { height: 3.6rem; }
+.guia .assinaturas .assina { display: block; margin-top: 1.6rem; border-top: 1px solid var(--ink); padding-top: .2rem; font-size: .92em; }
+.guia h2 { font-size: var(--step-0); }
+
+@media print {
+  /* A guia e' a segunda folha: sai sempre em pagina propria, com as bordas
+     pretas — em cinza claro a copia impressa fica ilegivel no balcao. */
+  .documento.guia { break-before: page; }
+  .guia td, .guia th, .guia .titulo-bloco { border-color: #000 !important; }
+  .guia .titulo-bloco { background: #eee !important; }
+  .guia table.itens th { background: #eee !important; }
+}
+
+@media (max-width: 640px) {
+  /* Guia no celular: a tabela some se comprimir demais, entao rola na
+     horizontal dentro do proprio bloco em vez de espremer a coluna. */
+  .guia table { table-layout: auto; }
+  .guia { overflow-x: auto; }
+}

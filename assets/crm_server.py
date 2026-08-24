@@ -38,6 +38,10 @@ from urllib.parse import urlparse, parse_qs
 
 import yaml
 
+# Motor do pedido de cirurgia (catalogo clinico + guia TISS + a tela clicavel).
+# Fica ao lado deste arquivo em /opt/copiloto.
+import pedido as pedido_mod
+
 PORT = int(os.environ.get("COPILOTO_CRM_PORT", "8101"))
 DASH_USER = os.environ.get("DASH_USER", "admin")
 DASH_PASS = os.environ.get("DASH_PASS", "TroqueASenha2026")
@@ -282,6 +286,9 @@ def _list_sites():
             with open(idx, encoding="utf-8", errors="ignore") as f:
                 head = f.read(4000)
             is_doc = 'class="documento"' in head or "class='documento'" in head
+            # Pedido de cirurgia: alem de documento, tem os cliques guardados
+            # ao lado — da' pra reabrir o formulario em vez de editar o texto.
+            is_pedido = os.path.isfile(os.path.join(pasta, "pedido.json"))
             title_m = re.search(r"<title>(.*?)</title>", head, re.S)
             title = (title_m.group(1).strip() if title_m else nome)[:120]
             out.append(
@@ -289,7 +296,7 @@ def _list_sites():
                     "nome": nome,
                     "titulo": title,
                     "url": f"/s/{nome}",
-                    "tipo": "documento" if is_doc else "pagina",
+                    "tipo": "pedido" if is_pedido else ("documento" if is_doc else "pagina"),
                     "modificado_em": int(st.st_mtime),
                     "tamanho": st.st_size,
                 }
@@ -555,7 +562,8 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
     <h1>CRM — funil do consultório</h1>
     <div class="sub">arraste o card entre as colunas · toque no ✉️ pra editar a mensagem de cada etapa</div>
   </div>
-  <div style="display:flex;gap:8px">
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <a class="btn btn-ghost" href="/crm/pedido" style="text-decoration:none;display:inline-flex;align-items:center">🦷 Pedido de cirurgia</a>
     <a class="btn btn-ghost" href="/documentos" style="text-decoration:none;display:inline-flex;align-items:center">📄 Documentos</a>
     <button class="btn" id="btnNovo">+ Novo Lead</button>
   </div>
@@ -774,7 +782,10 @@ textarea#fContent{width:100%;min-height:50vh;background:var(--bg);border:1px sol
     <h1>Documentos e páginas publicadas</h1>
     <div class="sub">tudo que o Copiloto publicou em /s — edite, baixe ou mande no grupo</div>
   </div>
-  <a class="btn btn-ghost" href="/crm" style="text-decoration:none;display:inline-flex;align-items:center">← CRM</a>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <a class="btn btn-ghost" href="/crm/pedido" style="text-decoration:none;display:inline-flex;align-items:center">🦷 Pedido de cirurgia</a>
+    <a class="btn btn-ghost" href="/crm" style="text-decoration:none;display:inline-flex;align-items:center">← CRM</a>
+  </div>
 </header>
 <div class="wrap" id="list"></div>
 
@@ -817,11 +828,12 @@ async function load() {
       <div class="info">
         <b>${escapeHtml(it.titulo)}</b>
         <div class="meta">
-          <span class="tag">${it.tipo === 'documento' ? 'documento' : 'página'}</span>
+          <span class="tag">${it.tipo === 'pedido' ? '🦷 pedido de cirurgia' : (it.tipo === 'documento' ? 'documento' : 'página')}</span>
           ${fmtDate(it.modificado_em)} · ${fmtBytes(it.tamanho)}
         </div>
       </div>
       <a class="open" href="${it.url}" target="_blank" rel="noopener">abrir ↗</a>
+      ${it.tipo === 'pedido' ? `<a class="btn btn-ghost" href="/crm/pedido?editar=${it.nome}" style="text-decoration:none">Refazer no formulário</a>` : ''}
       <button class="btn btn-ghost" data-nome="${it.nome}" data-titulo="${escapeHtml(it.titulo)}" data-tipo="${it.tipo}">Editar</button>
     </div>
   `).join('');
@@ -1042,6 +1054,26 @@ class H(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
 
+        if path in ("/crm/pedido", "/crm/pedido/"):
+            body = pedido_mod.FORM_PAGE.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        # Antes do <nome> generico abaixo: "catalogo" tambem casa [a-z0-9-]+.
+        if path == "/crm/api/pedido/catalogo":
+            return self._json(pedido_mod.catalogo())
+
+        m = re.match(r"^/crm/api/pedido/([a-z0-9-]+)$", path)
+        if m:
+            p = pedido_mod.ler_pedido(SITES_DIR, m.group(1))
+            if p is None:
+                return self._json({"error": "não encontrado"}, 404)
+            return self._json(p)
+
         if path == "/crm/api/cards":
             with _lock, _db() as conn:
                 rows = conn.execute("SELECT * FROM cards ORDER BY updated_at DESC").fetchall()
@@ -1099,6 +1131,25 @@ class H(BaseHTTPRequestHandler):
         if not self._guard():
             return
         path = urlparse(self.path).path
+
+        # Pedido de cirurgia — a tela /crm/pedido e a habilidade `pedido-cirurgia`
+        # (WhatsApp) entram pelo MESMO endpoint: a guia sai igual dos dois lados.
+        m = re.match(r"^/crm/api/pedido(?:/([a-z0-9-]+))?$", path)
+        if m:
+            b = self._body()
+            if not (b.get("paciente") or "").strip():
+                return self._json({"error": "paciente é obrigatório"}, 400)
+            p = pedido_mod.normalizar(b)
+            alvo = m.group(1)
+            if alvo and not _safe_site_name(alvo):
+                return self._json({"error": "nome inválido"}, 400)
+            try:
+                nome = pedido_mod.salvar_pedido(SITES_DIR, p, alvo)
+            except OSError as e:
+                return self._json({"error": str(e)}, 500)
+            url = f"https://{COPILOTO_DOMINIO}/s/{nome}" if COPILOTO_DOMINIO else f"/s/{nome}"
+            return self._json({"ok": True, "nome": nome, "url": url}, 201)
+
         if path == "/crm/api/cards":
             b = self._body()
             name = (b.get("name") or "").strip()

@@ -1,0 +1,89 @@
+{
+ "tipo": "ortognatica",
+ "tipo_livre": "",
+ "paciente": "Maria Fictícia",
+ "idade": "27",
+ "convenio": "CASSI",
+ "carteirinha": "",
+ "plano": "",
+ "validade_carteira": "",
+ "cns": "",
+ "maloclusao": "má-oclusão classe II",
+ "associados": [
+  "síndrome da apneia obstrutiva do sono",
+  "dificuldade mastigatória"
+ ],
+ "exames": [
+  "Tomografia computadorizada de feixe cônico",
+  "Telerradiografia lateral com traçado cefalométrico",
+  "Documentação ortodôntica completa",
+  "Polissonografia"
+ ],
+ "hospital": "Hospital de Exemplo",
+ "codigo_hospital": "",
+ "codigo_operadora": "",
+ "contratado": "",
+ "cnes": "",
+ "cid": "K07.2",
+ "cid_desc": "Anomalias da relação entre as arcadas dentárias",
+ "cid2": "",
+ "tipo_doenca": "",
+ "tempo_doenca": "",
+ "carater": "E",
+ "tipo_internacao": "2",
+ "regime": "1",
+ "diarias": "02",
+ "data_procedimento": "2026-09-15",
+ "cirurgiao": "Dr(a). [nome do cirurgião]",
+ "cro": "",
+ "uf": "",
+ "observacao": "Não necessariamente será utilizado todo OPME solicitado. Exemplo de demonstração — paciente e dados fictícios.",
+ "indicacao": "",
+ "justificativa": "",
+ "conduta": "",
+ "fornecedores": [
+  "ORTHOFACE (OSTEOMED)",
+  "STRYKER (CMO)",
+  "MEDCOSTA (KLS)"
+ ],
+ "procedimentos": [
+  {
+   "codigo": "30208050",
+   "desc": "OSTEOTOMIA LE FORT",
+   "qtd": "01"
+  },
+  {
+   "codigo": "30208025",
+   "desc": "OSTEOPLASTIA PARA MICROGNATISMO",
+   "qtd": "01"
+  },
+  {
+   "codigo": "30209021",
+   "desc": "OSTEOPLASTIA DE MANDÍBULA",
+   "qtd": "01"
+  }
+ ],
+ "materiais": [
+  {
+   "desc": "Miniplacas pré-bent / maxilar",
+   "qtd": "02"
+  },
+  {
+   "desc": "Parafusos 1.5 / 2.0",
+   "qtd": "44"
+  },
+  {
+   "desc": "Placa reta 2.0",
+   "qtd": "04"
+  },
+  {
+   "desc": "Ponta ultrassônica Piezo",
+   "qtd": "01"
+  },
+  {
+   "desc": "Serra reciprocante",
+   "qtd": "01"
+  }
+ ],
+ "_exemplo": true
+}
