@@ -316,6 +316,116 @@ def _soft_delete_site(nome):
     return True, None
 
 
+import html as _html_mod
+
+# Regex tuned ao esqueleto de /opt/data/sites/_kit/modelos/documento.html —
+# so serve pra paginas do tipo "documento" (a mesma pergunta do _list_sites).
+_DOC_HEADER_RE = re.compile(
+    r'<p class="rotulo">(.*?)</p>\s*<h1>(.*?)</h1>\s*<p class="small muted">(.*?)</p>', re.S
+)
+_DOC_DADOS_BLOCK_RE = re.compile(r'(<dl class="dados">)(.*?)(</dl>)', re.S)
+_DOC_DADOS_ITEM_RE = re.compile(r'<div><dt>(.*?)</dt><dd>(.*?)</dd></div>', re.S)
+_DOC_PROSA_BLOCK_RE = re.compile(r'(<section class="prosa"[^>]*>)(.*?)(</section>)', re.S)
+_DOC_SECTION_RE = re.compile(r'<h2>(.*?)</h2>\s*(<p>(.*?)</p>|<ul>(.*?)</ul>)', re.S)
+_DOC_LI_RE = re.compile(r'<li>(.*?)</li>', re.S)
+_DOC_AVISO_RE = re.compile(
+    r'(<div class="aviso">\s*<p><strong>)(.*?)(</strong>\s*)(.*?)(</p>\s*</div>)', re.S
+)
+_DOC_ASSINATURA_RE = re.compile(
+    r'(<div class="assinatura">\s*)(.*?)(<br>\s*<span class="muted">CRO\s*)(.*?)(</span>\s*</div>)', re.S
+)
+
+
+def _unesc(s):
+    return _html_mod.unescape((s or "").strip())
+
+
+def _esc(s):
+    return _html_mod.escape((s or "").strip(), quote=False)
+
+
+def _parse_documento(content):
+    """Extrai os campos editaveis de uma pagina gerada pelo modelo documento.html.
+    Devolve None se a estrutura esperada nao bater (aí o front cai pro editor
+    de HTML cru)."""
+    header = _DOC_HEADER_RE.search(content)
+    dados_block = _DOC_DADOS_BLOCK_RE.search(content)
+    prosa_block = _DOC_PROSA_BLOCK_RE.search(content)
+    aviso = _DOC_AVISO_RE.search(content)
+    assinatura = _DOC_ASSINATURA_RE.search(content)
+    if not (header and dados_block and prosa_block):
+        return None
+
+    dados = [
+        {"label": _unesc(m.group(1)), "valor": _unesc(m.group(2))}
+        for m in _DOC_DADOS_ITEM_RE.finditer(dados_block.group(2))
+    ]
+
+    secoes = []
+    for m in _DOC_SECTION_RE.finditer(prosa_block.group(2)):
+        titulo = _unesc(m.group(1))
+        if m.group(3) is not None:
+            secoes.append({"titulo": titulo, "tipo": "texto", "corpo": _unesc(m.group(3)), "itens": []})
+        else:
+            itens = [_unesc(li.group(1)) for li in _DOC_LI_RE.finditer(m.group(4) or "")]
+            secoes.append({"titulo": titulo, "tipo": "lista", "corpo": "", "itens": itens})
+
+    return {
+        "rotulo": _unesc(header.group(1)),
+        "titulo": _unesc(header.group(2)),
+        "emitido_em": _unesc(header.group(3)),
+        "dados": dados,
+        "secoes": secoes,
+        "pendencias": _unesc(aviso.group(4)) if aviso else "",
+        "cirurgiao": _unesc(assinatura.group(2)) if assinatura else "",
+        "cro": _unesc(assinatura.group(4)) if assinatura else "",
+    }
+
+
+def _render_documento(content, fields):
+    """Reescreve so os blocos de conteudo (dados/secoes/aviso/assinatura) do
+    HTML original, preservando tudo mais (head, kit, botao de imprimir...)."""
+    out = content
+
+    def _sub_header(m):
+        return f'<p class="rotulo">{_esc(fields.get("rotulo", ""))}</p>\n    <h1>{_esc(fields.get("titulo", ""))}</h1>\n    <p class="small muted">{_esc(fields.get("emitido_em", ""))}</p>'
+
+    out = _DOC_HEADER_RE.sub(_sub_header, out, count=1)
+
+    def _sub_dados(m):
+        itens = "\n    ".join(
+            f'<div><dt>{_esc(d.get("label",""))}</dt><dd>{_esc(d.get("valor",""))}</dd></div>'
+            for d in fields.get("dados", [])
+        )
+        return f'{m.group(1)}\n    {itens}\n  {m.group(3)}'
+
+    out = _DOC_DADOS_BLOCK_RE.sub(_sub_dados, out, count=1)
+
+    def _sub_prosa(m):
+        parts = []
+        for s in fields.get("secoes", []):
+            titulo = _esc(s.get("titulo", ""))
+            if s.get("tipo") == "lista":
+                lis = "\n      ".join(f'<li>{_esc(it)}</li>' for it in s.get("itens", []))
+                parts.append(f'<h2>{titulo}</h2>\n    <ul>\n      {lis}\n    </ul>')
+            else:
+                parts.append(f'<h2>{titulo}</h2>\n    <p>{_esc(s.get("corpo", ""))}</p>')
+        return f'{m.group(1)}\n    ' + "\n\n    ".join(parts) + f'\n  {m.group(3)}'
+
+    out = _DOC_PROSA_BLOCK_RE.sub(_sub_prosa, out, count=1)
+
+    def _sub_aviso(m):
+        return f'{m.group(1)}{m.group(3)}{_esc(fields.get("pendencias", ""))}{m.group(5)}'
+
+    out = _DOC_AVISO_RE.sub(_sub_aviso, out, count=1)
+
+    def _sub_assinatura(m):
+        return f'{m.group(1)}{_esc(fields.get("cirurgiao", ""))}{m.group(3)}{_esc(fields.get("cro", ""))}{m.group(5)}'
+
+    out = _DOC_ASSINATURA_RE.sub(_sub_assinatura, out, count=1)
+    return out
+
+
 def _home_channel_chat_id():
     try:
         with open(CONFIG_PATH, encoding="utf-8") as f:
@@ -636,12 +746,26 @@ header .sub{font-size:12px;color:var(--ink-soft)}
 .empty{color:var(--ink-soft);font-size:13px;padding:30px 0;text-align:center}
 dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:0;width:min(720px,94vw)}
 dialog::backdrop{background:rgba(0,0,0,.55)}
-.dlg-body{padding:16px}
+.dlg-body{padding:16px;max-height:82vh;overflow-y:auto}
 .dlg-body h2{font-size:15px;margin:0 0 12px}
 textarea#fContent{width:100%;min-height:50vh;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
 .dlg-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap}
 .status{font-size:12px;color:var(--ink-soft);margin-top:8px}
-@media (max-width:640px){.item{flex-wrap:wrap}.item .info{width:100%}}
+.campo{margin-bottom:12px}
+.campo label{display:block;font-size:11px;color:var(--ink-soft);margin-bottom:4px}
+.campo input,.campo textarea{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit}
+.campo textarea{min-height:70px;resize:vertical}
+.bloco{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;background:rgba(255,255,255,.02)}
+.bloco-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.bloco-head b{font-size:12px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em}
+.par{display:flex;gap:8px;margin-bottom:8px;align-items:flex-start}
+.par .campo{flex:1;margin-bottom:0}
+.mini{background:transparent;border:1px solid var(--line);color:var(--ink-soft);border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;white-space:nowrap}
+.mini:hover{color:var(--ink);border-color:var(--brand)}
+.item-lista{display:flex;gap:8px;margin-bottom:6px}
+.item-lista input{flex:1}
+.toggle-html{font-size:11px;color:var(--ink-soft);text-decoration:underline;cursor:pointer;background:none;border:none;padding:0;margin-bottom:10px}
+@media (max-width:640px){.item{flex-wrap:wrap}.item .info{width:100%}.par{flex-direction:column;gap:4px}}
 </style>
 </head>
 <body>
@@ -657,7 +781,9 @@ textarea#fContent{width:100%;min-height:50vh;background:var(--bg);border:1px sol
 <dialog id="dlgEdit">
   <div class="dlg-body">
     <h2 id="dlgTitle">Editar</h2>
-    <textarea id="fContent" spellcheck="false"></textarea>
+    <button class="toggle-html" id="btnToggleHtml" style="display:none"></button>
+    <div id="fieldsForm" style="display:none"></div>
+    <textarea id="fContent" spellcheck="false" style="display:none"></textarea>
     <div class="status" id="dlgStatus"></div>
     <div class="dlg-actions">
       <button class="btn btn-danger" id="btnDelete" style="margin-right:auto">Excluir</button>
@@ -696,21 +822,137 @@ async function load() {
         </div>
       </div>
       <a class="open" href="${it.url}" target="_blank" rel="noopener">abrir ↗</a>
-      <button class="btn btn-ghost" data-nome="${it.nome}" data-titulo="${escapeHtml(it.titulo)}">Editar</button>
+      <button class="btn btn-ghost" data-nome="${it.nome}" data-titulo="${escapeHtml(it.titulo)}" data-tipo="${it.tipo}">Editar</button>
     </div>
   `).join('');
-  el.querySelectorAll('button[data-nome]').forEach(b => b.addEventListener('click', () => openEdit(b.dataset.nome, b.dataset.titulo)));
+  el.querySelectorAll('button[data-nome]').forEach(b => b.addEventListener('click', () => openEdit(b.dataset.nome, b.dataset.titulo, b.dataset.tipo)));
 }
 
-async function openEdit(nome, titulo) {
+// ================= Editor visual de documento =================
+let editingTipo = null;
+let modoHtml = false;      // false = formulário visual, true = HTML cru
+let fieldsState = null;    // objeto vivo enquanto edita um documento
+
+function renderFieldsForm() {
+  const f = fieldsState;
+  const el = document.getElementById('fieldsForm');
+  let dadosHtml = f.dados.map((d, i) => `
+    <div class="par">
+      <div class="campo"><label>Rótulo</label><input type="text" data-path="dados.${i}.label" value="${escapeHtml(d.label)}"></div>
+      <div class="campo"><label>Valor</label><input type="text" data-path="dados.${i}.valor" value="${escapeHtml(d.valor)}"></div>
+      <button class="mini" data-remove-dado="${i}" title="Remover">✕</button>
+    </div>`).join('');
+
+  let secoesHtml = f.secoes.map((s, i) => {
+    let corpo;
+    if (s.tipo === 'lista') {
+      corpo = s.itens.map((it, j) => `
+        <div class="item-lista">
+          <input type="text" data-path="secoes.${i}.itens.${j}" value="${escapeHtml(it)}">
+          <button class="mini" data-remove-item="${i}:${j}">✕</button>
+        </div>`).join('') + `<button class="mini" data-add-item="${i}">+ item</button>`;
+    } else {
+      corpo = `<div class="campo"><textarea data-path="secoes.${i}.corpo">${escapeHtml(s.corpo)}</textarea></div>`;
+    }
+    return `<div class="bloco">
+      <div class="bloco-head">
+        <b>Seção ${i + 1}</b>
+        <button class="mini" data-remove-secao="${i}">Remover seção</button>
+      </div>
+      <div class="campo"><label>Título da seção</label><input type="text" data-path="secoes.${i}.titulo" value="${escapeHtml(s.titulo)}"></div>
+      ${corpo}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="campo"><label>Título do documento</label><input type="text" data-path="titulo" value="${escapeHtml(f.titulo)}"></div>
+    <div class="bloco"><div class="bloco-head"><b>Dados do paciente</b></div>${dadosHtml}
+      <button class="mini" data-add-dado="1">+ campo</button>
+    </div>
+    ${secoesHtml}
+    <button class="mini" data-add-secao="1" style="margin-bottom:12px">+ seção</button>
+    <div class="campo"><label>Pendências para o cirurgião confirmar</label><input type="text" data-path="pendencias" value="${escapeHtml(f.pendencias)}"></div>
+    <div class="par">
+      <div class="campo"><label>Nome do cirurgião</label><input type="text" data-path="cirurgiao" value="${escapeHtml(f.cirurgiao)}"></div>
+      <div class="campo"><label>CRO</label><input type="text" data-path="cro" value="${escapeHtml(f.cro)}"></div>
+    </div>
+  `;
+
+  el.querySelectorAll('[data-path]').forEach((elm) => {
+    elm.addEventListener('input', () => {
+      const parts = elm.dataset.path.split('.');
+      let obj = fieldsState;
+      for (let i = 0; i < parts.length - 1; i++) obj = obj[/^\d+$/.test(parts[i]) ? parseInt(parts[i]) : parts[i]];
+      obj[/^\d+$/.test(parts[parts.length - 1]) ? parseInt(parts[parts.length - 1]) : parts[parts.length - 1]] = elm.value;
+    });
+  });
+  el.querySelectorAll('[data-remove-dado]').forEach((b) => b.addEventListener('click', () => {
+    fieldsState.dados.splice(parseInt(b.dataset.removeDado), 1); renderFieldsForm();
+  }));
+  el.querySelector('[data-add-dado]')?.addEventListener('click', () => {
+    fieldsState.dados.push({label: 'Novo campo', valor: ''}); renderFieldsForm();
+  });
+  el.querySelectorAll('[data-remove-secao]').forEach((b) => b.addEventListener('click', () => {
+    fieldsState.secoes.splice(parseInt(b.dataset.removeSecao), 1); renderFieldsForm();
+  }));
+  el.querySelector('[data-add-secao]')?.addEventListener('click', () => {
+    fieldsState.secoes.push({titulo: 'Nova seção', tipo: 'texto', corpo: '', itens: []}); renderFieldsForm();
+  });
+  el.querySelectorAll('[data-add-item]').forEach((b) => b.addEventListener('click', () => {
+    fieldsState.secoes[parseInt(b.dataset.addItem)].itens.push(''); renderFieldsForm();
+  }));
+  el.querySelectorAll('[data-remove-item]').forEach((b) => b.addEventListener('click', () => {
+    const [si, ii] = b.dataset.removeItem.split(':').map(Number);
+    fieldsState.secoes[si].itens.splice(ii, 1); renderFieldsForm();
+  }));
+}
+
+function setModo(html) {
+  modoHtml = html;
+  document.getElementById('fieldsForm').style.display = html ? 'none' : (fieldsState ? '' : 'none');
+  document.getElementById('fContent').style.display = html ? '' : 'none';
+  document.getElementById('btnToggleHtml').textContent = html ? '← voltar pro editor visual' : 'ver/editar HTML (avançado)';
+}
+
+async function openEdit(nome, titulo, tipo) {
   editingNome = nome;
+  editingTipo = tipo;
+  fieldsState = null;
   document.getElementById('dlgTitle').textContent = titulo || nome;
   document.getElementById('dlgStatus').textContent = 'Carregando...';
   document.getElementById('dlgEdit').showModal();
-  const data = await api('/documentos/api/' + nome + '/content');
-  document.getElementById('fContent').value = data.content;
-  document.getElementById('dlgStatus').textContent = '';
+  const btnToggle = document.getElementById('btnToggleHtml');
+
+  if (tipo === 'documento') {
+    try {
+      fieldsState = await api('/documentos/api/' + nome + '/fields');
+      btnToggle.style.display = '';
+      setModo(false);
+      renderFieldsForm();
+      document.getElementById('dlgStatus').textContent = '';
+    } catch (e) {
+      btnToggle.style.display = 'none';
+      const data = await api('/documentos/api/' + nome + '/content');
+      document.getElementById('fContent').value = data.content;
+      setModo(true);
+      document.getElementById('dlgStatus').textContent = 'Essa página não tem o formato reconhecido — editando o HTML direto.';
+    }
+  } else {
+    btnToggle.style.display = 'none';
+    const data = await api('/documentos/api/' + nome + '/content');
+    document.getElementById('fContent').value = data.content;
+    setModo(true);
+    document.getElementById('dlgStatus').textContent = '';
+  }
 }
+
+document.getElementById('btnToggleHtml').addEventListener('click', async () => {
+  if (!modoHtml) {
+    const data = await api('/documentos/api/' + editingNome + '/content');
+    document.getElementById('fContent').value = data.content;
+  }
+  setModo(!modoHtml);
+});
 
 document.getElementById('btnCancel').addEventListener('click', () => document.getElementById('dlgEdit').close());
 document.getElementById('btnOpen').addEventListener('click', () => window.open('/s/' + editingNome, '_blank'));
@@ -718,7 +960,11 @@ document.getElementById('btnSave').addEventListener('click', async () => {
   const st = document.getElementById('dlgStatus');
   st.textContent = 'Salvando...';
   try {
-    await api('/documentos/api/' + editingNome + '/content', {method: 'PUT', body: JSON.stringify({content: document.getElementById('fContent').value})});
+    if (modoHtml || !fieldsState) {
+      await api('/documentos/api/' + editingNome + '/content', {method: 'PUT', body: JSON.stringify({content: document.getElementById('fContent').value})});
+    } else {
+      await api('/documentos/api/' + editingNome + '/fields', {method: 'PUT', body: JSON.stringify(fieldsState)});
+    }
     st.textContent = '✅ Salvo.';
   } catch (e) { st.textContent = '❌ Falha ao salvar.'; }
 });
@@ -830,6 +1076,21 @@ class H(BaseHTTPRequestHandler):
                     return self._json({"content": f.read()})
             except OSError as e:
                 return self._json({"error": str(e)}, 500)
+
+        m = re.match(r"^/documentos/api/([a-z0-9-]+)/fields$", path)
+        if m:
+            pasta = _safe_site_name(m.group(1))
+            if not pasta or not os.path.isdir(pasta):
+                return self._json({"error": "não encontrado"}, 404)
+            try:
+                with open(os.path.join(pasta, "index.html"), encoding="utf-8") as f:
+                    content = f.read()
+            except OSError as e:
+                return self._json({"error": str(e)}, 500)
+            fields = _parse_documento(content)
+            if fields is None:
+                return self._json({"error": "essa página não tem a estrutura de documento reconhecida"}, 422)
+            return self._json(fields)
 
         self.send_response(404)
         self.end_headers()
@@ -945,6 +1206,29 @@ class H(BaseHTTPRequestHandler):
                 pass
             with open(idx, "w", encoding="utf-8") as f:
                 f.write(content)
+            return self._json({"ok": True})
+
+        m = re.match(r"^/documentos/api/([a-z0-9-]+)/fields$", path)
+        if m:
+            pasta = _safe_site_name(m.group(1))
+            if not pasta or not os.path.isdir(pasta):
+                return self._json({"error": "não encontrado"}, 404)
+            idx = os.path.join(pasta, "index.html")
+            try:
+                with open(idx, encoding="utf-8") as f:
+                    content = f.read()
+            except OSError as e:
+                return self._json({"error": str(e)}, 500)
+            fields = self._body()
+            backup_dir = os.path.join(BACKUPS_DIR, time.strftime("%Y%m%d-%H%M%S") + "-edicao-" + m.group(1))
+            os.makedirs(backup_dir, exist_ok=True)
+            try:
+                shutil.copy2(idx, os.path.join(backup_dir, "index.html"))
+            except OSError:
+                pass
+            novo = _render_documento(content, fields)
+            with open(idx, "w", encoding="utf-8") as f:
+                f.write(novo)
             return self._json({"ok": True})
 
         self.send_response(404)
