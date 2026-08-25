@@ -29,6 +29,11 @@ services:
       # Acesso do agente ao servidor (root por SSH). "off" desliga e a chave
       # sai do authorized_keys do host no proximo boot.
       - COPILOTO_HOST_SSH=on
+      # Atualizacao automatica: a instalacao confere a cada 2 min se saiu versao
+      # nova da imagem e, quando o copiloto estiver ocioso, se atualiza sozinha
+      # (avisa antes e depois no grupo). "off" desliga e so o /update manual vale.
+      # Depende do acesso ao servidor acima.
+      - COPILOTO_AUTO_UPDATE=on
     volumes:
       - /opt/copiloto/data:/opt/data
       # Da ao agente acesso SSH ao proprio servidor: no boot ele autoriza a

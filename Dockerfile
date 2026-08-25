@@ -19,7 +19,8 @@ COPY assets/ /opt/copiloto/
 COPY cont-init/03-copiloto /etc/cont-init.d/03-copiloto
 COPY s6/copiloto-qr /etc/s6-overlay/s6-rc.d/copiloto-qr
 COPY s6/copiloto-crm /etc/s6-overlay/s6-rc.d/copiloto-crm
-RUN chmod +x /etc/cont-init.d/03-copiloto /etc/s6-overlay/s6-rc.d/copiloto-qr/run /etc/s6-overlay/s6-rc.d/copiloto-crm/run /opt/copiloto/*.py /opt/copiloto/*.sh 2>/dev/null || true;     printf longrun > /etc/s6-overlay/s6-rc.d/copiloto-qr/type;     printf longrun > /etc/s6-overlay/s6-rc.d/copiloto-crm/type;     touch /etc/s6-overlay/s6-rc.d/user/contents.d/copiloto-qr;     touch /etc/s6-overlay/s6-rc.d/user/contents.d/copiloto-crm;     /opt/hermes/.venv/bin/python /opt/copiloto/patch-bridge.py /opt/hermes/scripts/whatsapp-bridge/bridge.js;     node --check /opt/hermes/scripts/whatsapp-bridge/bridge.js
+COPY s6/copiloto-update /etc/s6-overlay/s6-rc.d/copiloto-update
+RUN chmod +x /etc/cont-init.d/03-copiloto /etc/s6-overlay/s6-rc.d/copiloto-qr/run /etc/s6-overlay/s6-rc.d/copiloto-crm/run /etc/s6-overlay/s6-rc.d/copiloto-update/run /opt/copiloto/*.py /opt/copiloto/*.sh 2>/dev/null || true;     printf longrun > /etc/s6-overlay/s6-rc.d/copiloto-qr/type;     printf longrun > /etc/s6-overlay/s6-rc.d/copiloto-crm/type;     printf longrun > /etc/s6-overlay/s6-rc.d/copiloto-update/type;     touch /etc/s6-overlay/s6-rc.d/user/contents.d/copiloto-qr;     touch /etc/s6-overlay/s6-rc.d/user/contents.d/copiloto-crm;     touch /etc/s6-overlay/s6-rc.d/user/contents.d/copiloto-update;     /opt/hermes/.venv/bin/python /opt/copiloto/patch-bridge.py /opt/hermes/scripts/whatsapp-bridge/bridge.js;     node --check /opt/hermes/scripts/whatsapp-bridge/bridge.js
 # O modo audio (/voice tts) sintetizava e MORRIA na hora de salvar: a imagem
 # base traz HERMES_WRITE_SAFE_ROOT=/opt/data, e o auto-TTS do gateway escreve o
 # .ogg em $TMPDIR/hermes_voice/ (=/tmp) — fora do safe root. O guard recusava

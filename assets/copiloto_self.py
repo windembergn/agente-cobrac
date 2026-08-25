@@ -671,6 +671,29 @@ def _servico_do_copiloto():
     return None, "nenhum servico rodando a imagem do copiloto"
 
 
+def disparar_update(servico, canal="latest", atraso=None):
+    """Manda o host trocar a imagem do servico. Devolve (ok, saida).
+
+    Dispara SOLTO no host: o proprio container morre no meio da atualizacao,
+    entao o comando nao pode depender desta sessao de SSH continuar viva.
+
+    `--image <tag>` e' o que puxa a versao nova: o Swarm re-resolve a tag no
+    registro e pega o digest novo (por isso existe --no-resolve-image, para
+    DESLIGAR esse comportamento). Nada de "--resolve-image always" aqui: essa
+    flag e' do `docker stack deploy`, nao do `service update`, e o comando
+    morre com erro de uso sem atualizar nada.
+
+    Usada pelo /update (pedido do cirurgiao) e pelo auto-update (sozinho).
+    """
+    if atraso is None:
+        atraso = ATRASO_UPDATE_S
+    disparo = (
+        "nohup sh -c 'sleep %d; docker service update --force "
+        "--image %s:%s %s' >/tmp/copiloto-update.log 2>&1 &"
+    ) % (atraso, IMAGEM, canal, servico)
+    return _ssh(disparo, timeout=20)
+
+
 def cmd_atualizar():
     """/update no grupo: puxa a versao nova da imagem e reinicia o servico.
 
@@ -706,19 +729,7 @@ def cmd_atualizar():
     except Exception:
         pass
 
-    # Dispara SOLTO no host: o proprio container morre no meio da atualizacao,
-    # entao o comando nao pode depender desta sessao de SSH continuar viva.
-    #
-    # `--image <tag>` e' o que puxa a versao nova: o Swarm re-resolve a tag no
-    # registro e pega o digest novo (por isso existe --no-resolve-image, para
-    # DESLIGAR esse comportamento). Nada de "--resolve-image always" aqui: essa
-    # flag e' do `docker stack deploy`, nao do `service update`, e o comando
-    # morre com erro de uso sem atualizar nada.
-    disparo = (
-        "nohup sh -c 'sleep %d; docker service update --force "
-        "--image %s:latest %s' >/tmp/copiloto-update.log 2>&1 &"
-    ) % (ATRASO_UPDATE_S, IMAGEM, servico)
-    ok, saida = _ssh(disparo, timeout=20)
+    ok, saida = disparar_update(servico)
     if not ok:
         AVISO_UPDATE.unlink(missing_ok=True)
         _erro(
