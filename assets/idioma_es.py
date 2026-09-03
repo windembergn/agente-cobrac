@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Copiloto — pedido de cirurgia em ESPANHOL, e o tramite da ESPANHA.
+"""Copiloto em ESPANHOL: os textos, e o tramite fora do Brasil.
 
-Este modulo e' so' DADO: catalogo clinico traduzido, aseguradoras espanholas e
-os rotulos da tela e dos documentos. Quem monta a pagina continua sendo o
-`pedido.py` — aqui nao ha logica de render.
+Este modulo e' so' DADO — catalogo clinico traduzido, aseguradoras, e os
+rotulos de TODAS as telas (pedido de cirurgia, CRM, documentos). Quem monta
+pagina e' o `pedido.py` e o `crm_server.py`; aqui nao ha logica de render.
+
+Uma fonte so' de traducao de proposito: telas em espanhol espalhadas em copias
+do HTML sairiam de sincronia no primeiro conserto feito com pressa.
 
 Duas coisas independentes, e e' de proposito que sejam:
 
@@ -816,3 +819,234 @@ def solicitud(pais):
     d = dict(SOLICITUD_ES)
     d.update(SOLICITUD_OVERRIDE.get(pais, {}))
     return d
+
+
+# ============================================================ CRM E DOCUMENTOS
+# As outras duas telas do painel. Mesma mecanica do pedido: @@chave@@ no HTML e
+# o dicionario aqui, para nao existir uma segunda copia do HTML em espanhol.
+#
+# As CHAVES das etapas do funil (novo_lead, atendimento...) nao mudam nunca:
+# elas sao o que esta gravado no banco de cada instalacao. So' o rotulo muda.
+ETAPAS_ES = [
+    ("novo_lead", "Nuevo contacto"),
+    ("atendimento", "En atención"),
+    ("agendou", "Cita agendada"),
+    ("compareceu", "Asistió"),
+    ("exames", "Pruebas"),
+    ("cirurgia", "Cirugía"),
+    ("finalizado", "Finalizado"),
+]
+
+# {{nome}} continua em portugues de proposito: e' um TOKEN que o codigo procura
+# no texto, nao uma palavra que a pessoa le. Traduzi-lo quebraria a substituicao
+# em toda instalacao que ja tem mensagem gravada.
+MENSAGENS_ES = {
+    "novo_lead": ("", 0),
+    "atendimento": (
+        "¡Hola {{nome}}! Hemos recibido tu mensaje y ya estamos contigo. "
+        "Cualquier duda, escríbenos por aquí.",
+        1,
+    ),
+    "agendou": (
+        "¡Listo, {{nome}}! Tu cita ya está agendada. Si surge algún imprevisto, "
+        "avísanos por aquí.",
+        1,
+    ),
+    "compareceu": (
+        "¡Ha sido un placer atenderte hoy, {{nome}}! Cualquier duda después de la "
+        "consulta, escríbenos.",
+        1,
+    ),
+    "exames": (
+        "Hola {{nome}}, tus pruebas están en curso. En cuanto tengamos el "
+        "resultado te avisamos por aquí.",
+        1,
+    ),
+    "cirurgia": (
+        "Tu cirugía ya está programada, {{nome}}. En breve te enviamos las "
+        "indicaciones de preparación.",
+        1,
+    ),
+    "finalizado": (
+        "{{nome}}, ¡tu tratamiento con nosotros ha finalizado! Si necesitas algo, "
+        "aquí estamos. 🙏",
+        1,
+    ),
+}
+
+TEXTOS_CRM = {
+    "pt": {
+        "_locale": "pt-BR",
+        # --- CRM (funil)
+        "crm_title_tag": "CRM — Copiloto",
+        "crm_h1": "CRM — funil do consultório",
+        "crm_sub": "arraste o card entre as colunas · toque no ✉️ pra editar a mensagem de cada etapa",
+        "crm_nav_docs": "📄 Documentos",
+        "crm_nav_pedido": "🦷 Pedido de cirurgia",
+        "crm_btn_novo": "+ Novo Lead",
+        "crm_dlg_novo": "Novo Lead",
+        "crm_l_nome": "Nome",
+        "crm_l_tel": "Telefone (com DDI, só números)",
+        "crm_ph_tel": "5511999999999",
+        "crm_l_obs": "Observações",
+        "crm_btn_excluir": "Excluir",
+        "crm_btn_cancelar": "Cancelar",
+        "crm_btn_salvar": "Salvar",
+        "crm_dlg_msg": "Mensagem da etapa",
+        "crm_chk_auto": "Disparar automaticamente ao entrar nesta etapa",
+        "crm_l_texto": "Texto (use {{nome}} para o nome do paciente)",
+        "crm_title_msg": "Mensagem automática desta etapa",
+        "crm_editar_lead": "Editar lead",
+        "crm_novo_lead": "Novo lead",
+        "crm_alerta_campos": "Preencha nome e telefone.",
+        "crm_conf_excluir": "Excluir este lead?",
+        "crm_msg_de": "Mensagem — ",
+        # --- Documentos
+        "doc_title_tag": "Documentos — Copiloto",
+        "doc_h1": "Documentos e páginas publicadas",
+        "doc_sub": "tudo que o Copiloto publicou em /s — edite, baixe ou mande no grupo",
+        "doc_nav_pedido": "🦷 Pedido de cirurgia",
+        "doc_nav_crm": "← CRM",
+        "doc_dlg_editar": "Editar",
+        "doc_btn_excluir": "Excluir",
+        "doc_btn_abrir": "Abrir página",
+        "doc_btn_guia": "📲 Guia",
+        "doc_btn_rel": "📲 Relatório",
+        "doc_btn_enviar": "📲 Enviar PDF no grupo",
+        "doc_btn_fechar": "Fechar",
+        "doc_btn_salvar": "Salvar",
+        "doc_vazio": "Nenhum documento publicado ainda.",
+        "doc_tag_pedido": "🦷 pedido de cirurgia",
+        "doc_tag_documento": "documento",
+        "doc_tag_pagina": "página",
+        "doc_abrir": "abrir ↗",
+        "doc_refazer": "Refazer no formulário",
+        "doc_editar": "Editar",
+        "doc_l_rotulo": "Rótulo",
+        "doc_l_valor": "Valor",
+        "doc_remover": "Remover",
+        "doc_add_item": "+ item",
+        "doc_secao": "Seção",
+        "doc_remover_secao": "Remover seção",
+        "doc_l_titulo_secao": "Título da seção",
+        "doc_l_titulo_doc": "Título do documento",
+        "doc_dados_paciente": "Dados do paciente",
+        "doc_add_campo": "+ campo",
+        "doc_add_secao": "+ seção",
+        "doc_l_pendencias": "Pendências para o cirurgião confirmar",
+        "doc_l_cirurgiao": "Nome do cirurgião",
+        "doc_l_conselho": "CRO",
+        "doc_novo_campo": "Novo campo",
+        "doc_nova_secao": "Nova seção",
+        "doc_toggle_html": "ver/editar HTML (avançado)",
+        "doc_toggle_visual": "← voltar pro editor visual",
+        "doc_carregando": "Carregando...",
+        "doc_os_dois": "📲 Os dois",
+        "doc_aviso_pedido": 'Isto é um pedido de cirurgia: para mudar os dados use "Refazer no formulário" (aqui você só ajusta o texto da versão completa).',
+        "doc_sem_formato": "Essa página não tem o formato reconhecido — editando o HTML direto.",
+        "doc_salvando": "Salvando...",
+        "doc_salvo": "✅ Salvo.",
+        "doc_falha_salvar": "❌ Falha ao salvar.",
+        "doc_conf_excluir_a": 'Excluir "',
+        "doc_conf_excluir_b": '"? (fica guardado como cópia de segurança)',
+        "doc_a_guia": "a guia",
+        "doc_o_rel": "o relatório",
+        "doc_o_pdf": "o PDF",
+        "doc_gerando_a": "Gerando ",
+        "doc_gerando_b": " e enviando no grupo...",
+        "doc_enviei_a": "✅ Enviei ",
+        "doc_enviei_b": " no grupo.",
+        "doc_falha_enviar": "❌ Falha ao enviar — confira se o WhatsApp está conectado.",
+    },
+    "es": {
+        "_locale": "es-ES",
+        # --- CRM (embudo)
+        "crm_title_tag": "CRM — Copiloto",
+        "crm_h1": "CRM — embudo de la consulta",
+        "crm_sub": "arrastra la ficha entre las columnas · toca el ✉️ para editar el mensaje de cada etapa",
+        "crm_nav_docs": "📄 Documentos",
+        "crm_nav_pedido": "🦷 Solicitud de cirugía",
+        "crm_btn_novo": "+ Nuevo contacto",
+        "crm_dlg_novo": "Nuevo contacto",
+        "crm_l_nome": "Nombre",
+        "crm_l_tel": "Teléfono (con prefijo del país, solo números)",
+        "crm_ph_tel": "584241234567",
+        "crm_l_obs": "Observaciones",
+        "crm_btn_excluir": "Eliminar",
+        "crm_btn_cancelar": "Cancelar",
+        "crm_btn_salvar": "Guardar",
+        "crm_dlg_msg": "Mensaje de la etapa",
+        "crm_chk_auto": "Enviar automáticamente al entrar en esta etapa",
+        "crm_l_texto": "Texto (usa {{nome}} para el nombre del paciente)",
+        "crm_title_msg": "Mensaje automático de esta etapa",
+        "crm_editar_lead": "Editar contacto",
+        "crm_novo_lead": "Nuevo contacto",
+        "crm_alerta_campos": "Rellena nombre y teléfono.",
+        "crm_conf_excluir": "¿Eliminar este contacto?",
+        "crm_msg_de": "Mensaje — ",
+        # --- Documentos
+        "doc_title_tag": "Documentos — Copiloto",
+        "doc_h1": "Documentos y páginas publicadas",
+        "doc_sub": "todo lo que el Copiloto ha publicado en /s — edita, descarga o envíalo al grupo",
+        "doc_nav_pedido": "🦷 Solicitud de cirugía",
+        "doc_nav_crm": "← CRM",
+        "doc_dlg_editar": "Editar",
+        "doc_btn_excluir": "Eliminar",
+        "doc_btn_abrir": "Abrir página",
+        "doc_btn_guia": "📲 Solicitud",
+        "doc_btn_rel": "📲 Informe",
+        "doc_btn_enviar": "📲 Enviar PDF al grupo",
+        "doc_btn_fechar": "Cerrar",
+        "doc_btn_salvar": "Guardar",
+        "doc_vazio": "Todavía no hay ningún documento publicado.",
+        "doc_tag_pedido": "🦷 solicitud de cirugía",
+        "doc_tag_documento": "documento",
+        "doc_tag_pagina": "página",
+        "doc_abrir": "abrir ↗",
+        "doc_refazer": "Rehacer en el formulario",
+        "doc_editar": "Editar",
+        "doc_l_rotulo": "Etiqueta",
+        "doc_l_valor": "Valor",
+        "doc_remover": "Quitar",
+        "doc_add_item": "+ elemento",
+        "doc_secao": "Sección",
+        "doc_remover_secao": "Quitar sección",
+        "doc_l_titulo_secao": "Título de la sección",
+        "doc_l_titulo_doc": "Título del documento",
+        "doc_dados_paciente": "Datos del paciente",
+        "doc_add_campo": "+ campo",
+        "doc_add_secao": "+ sección",
+        "doc_l_pendencias": "Pendiente de confirmar por el cirujano",
+        "doc_l_cirurgiao": "Nombre del cirujano",
+        "doc_l_conselho": "Nº de colegiado",
+        "doc_novo_campo": "Nuevo campo",
+        "doc_nova_secao": "Nueva sección",
+        "doc_toggle_html": "ver/editar HTML (avanzado)",
+        "doc_toggle_visual": "← volver al editor visual",
+        "doc_carregando": "Cargando...",
+        "doc_os_dois": "📲 Las dos",
+        "doc_aviso_pedido": 'Esto es una solicitud de cirugía: para cambiar los datos usa "Rehacer en el formulario" (aquí solo ajustas el texto de la versión completa).',
+        "doc_sem_formato": "Esta página no tiene el formato reconocido — estás editando el HTML directamente.",
+        "doc_salvando": "Guardando...",
+        "doc_salvo": "✅ Guardado.",
+        "doc_falha_salvar": "❌ No se pudo guardar.",
+        "doc_conf_excluir_a": '¿Eliminar "',
+        "doc_conf_excluir_b": '"? (se guarda una copia de seguridad)',
+        "doc_a_guia": "la solicitud",
+        "doc_o_rel": "el informe",
+        "doc_o_pdf": "el PDF",
+        "doc_gerando_a": "Generando ",
+        "doc_gerando_b": " y enviando al grupo...",
+        "doc_enviei_a": "✅ He enviado ",
+        "doc_enviei_b": " al grupo.",
+        "doc_falha_enviar": "❌ No se pudo enviar — comprueba que WhatsApp esté conectado.",
+    },
+}
+
+
+def textos_crm(idioma):
+    """Rotulos do CRM e dos documentos, com o PT-BR cobrindo o que faltar."""
+    base = dict(TEXTOS_CRM["pt"])
+    if idioma == "es":
+        base.update(TEXTOS_CRM["es"])
+    return base

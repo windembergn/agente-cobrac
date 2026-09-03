@@ -40,7 +40,30 @@ import yaml
 
 # Motor do pedido de cirurgia (catalogo clinico + guia TISS + a tela clicavel).
 # Fica ao lado deste arquivo em /opt/copiloto.
+import idioma_es
 import pedido as pedido_mod
+
+
+def _idi():
+    """O idioma da instalacao. Quem manda e' o pedido_mod, para nao existirem
+    duas leituras do COPILOTO_IDIOMA que possam discordar."""
+    return pedido_mod.idioma()
+
+
+def _t():
+    return idioma_es.textos_crm(_idi())
+
+
+def _statuses():
+    """As etapas do funil, com o rotulo no idioma em vigor.
+
+    As CHAVES nunca mudam: elas estao gravadas na coluna `status` de cada card
+    do banco. Traduzir chave seria perder o funil inteiro de quem ja usa."""
+    return idioma_es.ETAPAS_ES if _idi() == "es" else STATUSES
+
+
+def _mensagens_padrao():
+    return idioma_es.MENSAGENS_ES if _idi() == "es" else DEFAULT_TEMPLATES
 
 PORT = int(os.environ.get("COPILOTO_CRM_PORT", "8101"))
 DASH_USER = os.environ.get("DASH_USER", "admin")
@@ -141,11 +164,30 @@ def _init_db():
                 error TEXT
             )"""
         )
-        for status, (message, enabled) in DEFAULT_TEMPLATES.items():
+        padrao = _mensagens_padrao()
+        for status, (message, enabled) in padrao.items():
             conn.execute(
                 "INSERT OR IGNORE INTO templates (status, message, enabled) VALUES (?, ?, ?)",
                 (status, message, enabled),
             )
+        # Reconciliacao de idioma, com a MESMA regra da persona e das paginas de
+        # exemplo: so' troca o que ninguem editou. Uma instalacao criada antes
+        # de COPILOTO_IDIOMA=es tem as mensagens semeadas em portugues, e um
+        # INSERT OR IGNORE nunca as alcancaria — o paciente hispano receberia
+        # "Sua cirurgia esta agendada" no WhatsApp. Mensagem que o cirurgiao
+        # escreveu nao e' tocada.
+        de_fabrica = {
+            m for idioma in (DEFAULT_TEMPLATES, idioma_es.MENSAGENS_ES)
+            for (m, _e) in idioma.values() if m
+        }
+        for status, (message, _enabled) in padrao.items():
+            row = conn.execute(
+                "SELECT message FROM templates WHERE status = ?", (status,)
+            ).fetchone()
+            if row and row[0] != message and row[0] in de_fabrica:
+                conn.execute(
+                    "UPDATE templates SET message = ? WHERE status = ?", (message, status)
+                )
         conn.commit()
 
 
@@ -530,11 +572,11 @@ def _send_pdf_to_group(nome, titulo, parte=None):
 
 # ============================================================ FRONTEND (HTML)
 PAGE = """<!doctype html>
-<html lang="pt-BR">
+<html lang="@@_lang@@">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CRM — Copiloto</title>
+<title>@@crm_title_tag@@</title>
 <style>
 :root{--bg:#0e131a;--panel:#151c26;--panel-2:#1c2531;--line:#293445;--ink:#e7ecf3;--ink-soft:#98a7b8;--brand:#0e5aa7;--ok:#1e8e5a;--warn:#b8862a}
 *{box-sizing:border-box}
@@ -577,45 +619,45 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
 <body>
 <header>
   <div>
-    <h1>CRM — funil do consultório</h1>
-    <div class="sub">arraste o card entre as colunas · toque no ✉️ pra editar a mensagem de cada etapa</div>
+    <h1>@@crm_h1@@</h1>
+    <div class="sub">@@crm_sub@@</div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <a class="btn btn-ghost" href="/crm/pedido" style="text-decoration:none;display:inline-flex;align-items:center">🦷 Pedido de cirurgia</a>
-    <a class="btn btn-ghost" href="/documentos" style="text-decoration:none;display:inline-flex;align-items:center">📄 Documentos</a>
-    <button class="btn" id="btnNovo">+ Novo Lead</button>
+    <a class="btn btn-ghost" href="/crm/pedido" style="text-decoration:none;display:inline-flex;align-items:center">@@crm_nav_pedido@@</a>
+    <a class="btn btn-ghost" href="/documentos" style="text-decoration:none;display:inline-flex;align-items:center">@@crm_nav_docs@@</a>
+    <button class="btn" id="btnNovo">@@crm_btn_novo@@</button>
   </div>
 </header>
 <div class="board" id="board"></div>
 
 <dialog id="dlgCard">
   <div class="dlg-body">
-    <h2 id="dlgCardTitle">Novo Lead</h2>
-    <div class="field"><label>Nome</label><input id="fName"></div>
-    <div class="field"><label>Telefone (com DDI, só números)</label><input id="fPhone" placeholder="5511999999999"></div>
-    <div class="field"><label>Observações</label><textarea id="fNotes"></textarea></div>
+    <h2 id="dlgCardTitle">@@crm_dlg_novo@@</h2>
+    <div class="field"><label>@@crm_l_nome@@</label><input id="fName"></div>
+    <div class="field"><label>@@crm_l_tel@@</label><input id="fPhone" placeholder="@@crm_ph_tel@@"></div>
+    <div class="field"><label>@@crm_l_obs@@</label><textarea id="fNotes"></textarea></div>
     <div class="dlg-actions">
-      <button class="btn btn-danger" id="btnDelete" style="display:none;margin-right:auto">Excluir</button>
-      <button class="btn btn-ghost" id="btnCancelCard">Cancelar</button>
-      <button class="btn" id="btnSaveCard">Salvar</button>
+      <button class="btn btn-danger" id="btnDelete" style="display:none;margin-right:auto">@@crm_btn_excluir@@</button>
+      <button class="btn btn-ghost" id="btnCancelCard">@@crm_btn_cancelar@@</button>
+      <button class="btn" id="btnSaveCard">@@crm_btn_salvar@@</button>
     </div>
   </div>
 </dialog>
 
 <dialog id="dlgMsg">
   <div class="dlg-body">
-    <h2 id="dlgMsgTitle">Mensagem da etapa</h2>
+    <h2 id="dlgMsgTitle">@@crm_dlg_msg@@</h2>
     <div class="field toggle">
       <input type="checkbox" id="fEnabled" style="width:auto">
-      <label style="margin:0" for="fEnabled">Disparar automaticamente ao entrar nesta etapa</label>
+      <label style="margin:0" for="fEnabled">@@crm_chk_auto@@</label>
     </div>
     <div class="field">
-      <label>Texto (use {{nome}} para o nome do paciente)</label>
+      <label>@@crm_l_texto@@</label>
       <textarea id="fMessage"></textarea>
     </div>
     <div class="dlg-actions">
-      <button class="btn btn-ghost" id="btnCancelMsg">Cancelar</button>
-      <button class="btn" id="btnSaveMsg">Salvar</button>
+      <button class="btn btn-ghost" id="btnCancelMsg">@@crm_btn_cancelar@@</button>
+      <button class="btn" id="btnSaveMsg">@@crm_btn_salvar@@</button>
     </div>
   </div>
 </dialog>
@@ -651,7 +693,7 @@ function render() {
         <b>${label}</b>
         <div style="display:flex;align-items:center;gap:6px">
           <span class="count">${cards.filter(c => c.status === key).length}</span>
-          <button class="col-msg-btn ${tpl.enabled ? '' : 'off'}" data-status="${key}" title="Mensagem automática desta etapa">✉️</button>
+          <button class="col-msg-btn ${tpl.enabled ? '' : 'off'}" data-status="${key}" title="@@crm_title_msg@@">✉️</button>
         </div>
       </div>
       <div class="col-body" data-status="${key}"></div>
@@ -688,7 +730,7 @@ function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, m => ({'&':'
 
 function openCardDialog(card) {
   editingCardId = card ? card.id : null;
-  document.getElementById('dlgCardTitle').textContent = card ? 'Editar lead' : 'Novo lead';
+  document.getElementById('dlgCardTitle').textContent = card ? '@@crm_editar_lead@@' : '@@crm_novo_lead@@';
   document.getElementById('fName').value = card ? card.name : '';
   document.getElementById('fPhone').value = card ? card.phone : '';
   document.getElementById('fNotes').value = card ? card.notes : '';
@@ -704,14 +746,14 @@ document.getElementById('btnSaveCard').addEventListener('click', async () => {
     phone: document.getElementById('fPhone').value.trim(),
     notes: document.getElementById('fNotes').value.trim(),
   };
-  if (!body.name || !body.phone) return alert('Preencha nome e telefone.');
+  if (!body.name || !body.phone) return alert('@@crm_alerta_campos@@');
   if (editingCardId) await api('/crm/api/cards/' + editingCardId, {method: 'PATCH', body: JSON.stringify(body)});
   else await api('/crm/api/cards', {method: 'POST', body: JSON.stringify(body)});
   document.getElementById('dlgCard').close();
   load();
 });
 document.getElementById('btnDelete').addEventListener('click', async () => {
-  if (!editingCardId || !confirm('Excluir este lead?')) return;
+  if (!editingCardId || !confirm('@@crm_conf_excluir@@')) return;
   await api('/crm/api/cards/' + editingCardId, {method: 'DELETE'});
   document.getElementById('dlgCard').close();
   load();
@@ -721,7 +763,7 @@ function openMsgDialog(status) {
   editingStatus = status;
   const tpl = templates[status] || {enabled: false, message: ''};
   const label = STATUSES.find(s => s[0] === status)[1];
-  document.getElementById('dlgMsgTitle').textContent = 'Mensagem — ' + label;
+  document.getElementById('dlgMsgTitle').textContent = '@@crm_msg_de@@' + label;
   document.getElementById('fEnabled').checked = !!tpl.enabled;
   document.getElementById('fMessage').value = tpl.message || '';
   document.getElementById('dlgMsg').showModal();
@@ -742,15 +784,29 @@ setInterval(load, 15000);
 </body>
 </html>
 """
-PAGE = PAGE.replace("__STATUSES_JSON__", json.dumps(STATUSES, ensure_ascii=False))
+def _no_idioma(template):
+    """Troca os @@rotulos@@ pelo texto do idioma em vigor.
+
+    Uma chave que nao existir fica visivel na tela de proposito: erro de
+    traducao tem que aparecer para quem testa, nao virar espaco em branco."""
+    t = dict(_t())
+    t["_lang"] = "es" if _idi() == "es" else "pt-BR"
+    return re.sub(r"@@([a-z_][a-z0-9_]*)@@", lambda m: str(t.get(m.group(1), m.group(0))), template)
+
+
+def page():
+    """A tela do CRM, montada no idioma da instalacao a cada requisicao."""
+    return _no_idioma(PAGE).replace(
+        "__STATUSES_JSON__", json.dumps(_statuses(), ensure_ascii=False)
+    )
 
 
 DOCS_PAGE = """<!doctype html>
-<html lang="pt-BR">
+<html lang="@@_lang@@">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Documentos — Copiloto</title>
+<title>@@doc_title_tag@@</title>
 <style>
 :root{--bg:#0e131a;--panel:#151c26;--panel-2:#1c2531;--line:#293445;--ink:#e7ecf3;--ink-soft:#98a7b8;--brand:#0e5aa7}
 *{box-sizing:border-box}
@@ -797,31 +853,31 @@ textarea#fContent{width:100%;min-height:50vh;background:var(--bg);border:1px sol
 <body>
 <header>
   <div>
-    <h1>Documentos e páginas publicadas</h1>
-    <div class="sub">tudo que o Copiloto publicou em /s — edite, baixe ou mande no grupo</div>
+    <h1>@@doc_h1@@</h1>
+    <div class="sub">@@doc_sub@@</div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <a class="btn btn-ghost" href="/crm/pedido" style="text-decoration:none;display:inline-flex;align-items:center">🦷 Pedido de cirurgia</a>
-    <a class="btn btn-ghost" href="/crm" style="text-decoration:none;display:inline-flex;align-items:center">← CRM</a>
+    <a class="btn btn-ghost" href="/crm/pedido" style="text-decoration:none;display:inline-flex;align-items:center">@@crm_nav_pedido@@</a>
+    <a class="btn btn-ghost" href="/crm" style="text-decoration:none;display:inline-flex;align-items:center">@@doc_nav_crm@@</a>
   </div>
 </header>
 <div class="wrap" id="list"></div>
 
 <dialog id="dlgEdit">
   <div class="dlg-body">
-    <h2 id="dlgTitle">Editar</h2>
+    <h2 id="dlgTitle">@@doc_dlg_editar@@</h2>
     <button class="toggle-html" id="btnToggleHtml" style="display:none"></button>
     <div id="fieldsForm" style="display:none"></div>
     <textarea id="fContent" spellcheck="false" style="display:none"></textarea>
     <div class="status" id="dlgStatus"></div>
     <div class="dlg-actions">
-      <button class="btn btn-danger" id="btnDelete" style="margin-right:auto">Excluir</button>
-      <button class="btn btn-ghost" id="btnOpen">Abrir página</button>
-      <button class="btn btn-ghost" id="btnSendGuia" style="display:none">📲 Guia</button>
-      <button class="btn btn-ghost" id="btnSendRelatorio" style="display:none">📲 Relatório</button>
-      <button class="btn btn-ghost" id="btnSendGroup">📲 Enviar PDF no grupo</button>
-      <button class="btn btn-ghost" id="btnCancel">Fechar</button>
-      <button class="btn" id="btnSave">Salvar</button>
+      <button class="btn btn-danger" id="btnDelete" style="margin-right:auto">@@doc_btn_excluir@@</button>
+      <button class="btn btn-ghost" id="btnOpen">@@doc_btn_abrir@@</button>
+      <button class="btn btn-ghost" id="btnSendGuia" style="display:none">@@doc_btn_guia@@</button>
+      <button class="btn btn-ghost" id="btnSendRelatorio" style="display:none">@@doc_btn_rel@@</button>
+      <button class="btn btn-ghost" id="btnSendGroup">@@doc_btn_enviar@@</button>
+      <button class="btn btn-ghost" id="btnCancel">@@doc_btn_fechar@@</button>
+      <button class="btn" id="btnSave">@@doc_btn_salvar@@</button>
     </div>
   </div>
 </dialog>
@@ -836,25 +892,25 @@ async function api(path, opts) {
 }
 
 function fmtBytes(n) { return n < 1024*1024 ? Math.round(n/1024)+' KB' : (n/1024/1024).toFixed(1)+' MB'; }
-function fmtDate(ts) { return new Date(ts*1000).toLocaleString('pt-BR'); }
+function fmtDate(ts) { return new Date(ts*1000).toLocaleString('@@_locale@@'); }
 function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
 async function load() {
   const items = await api('/documentos/api/list');
   const el = document.getElementById('list');
-  if (!items.length) { el.innerHTML = '<div class="empty">Nenhum documento publicado ainda.</div>'; return; }
+  if (!items.length) { el.innerHTML = '<div class="empty">@@doc_vazio@@</div>'; return; }
   el.innerHTML = items.map(it => `
     <div class="item">
       <div class="info">
         <b>${escapeHtml(it.titulo)}</b>
         <div class="meta">
-          <span class="tag">${it.tipo === 'pedido' ? '🦷 pedido de cirurgia' : (it.tipo === 'documento' ? 'documento' : 'página')}</span>
+          <span class="tag">${it.tipo === 'pedido' ? '@@doc_tag_pedido@@' : (it.tipo === 'documento' ? '@@doc_tag_documento@@' : '@@doc_tag_pagina@@')}</span>
           ${fmtDate(it.modificado_em)} · ${fmtBytes(it.tamanho)}
         </div>
       </div>
-      <a class="open" href="${it.url}" target="_blank" rel="noopener">abrir ↗</a>
-      ${it.tipo === 'pedido' ? `<a class="btn btn-ghost" href="/crm/pedido?editar=${it.nome}" style="text-decoration:none">Refazer no formulário</a>` : ''}
-      <button class="btn btn-ghost" data-nome="${it.nome}" data-titulo="${escapeHtml(it.titulo)}" data-tipo="${it.tipo}">Editar</button>
+      <a class="open" href="${it.url}" target="_blank" rel="noopener">@@doc_abrir@@</a>
+      ${it.tipo === 'pedido' ? `<a class="btn btn-ghost" href="/crm/pedido?editar=${it.nome}" style="text-decoration:none">@@doc_refazer@@</a>` : ''}
+      <button class="btn btn-ghost" data-nome="${it.nome}" data-titulo="${escapeHtml(it.titulo)}" data-tipo="${it.tipo}">@@doc_editar@@</button>
     </div>
   `).join('');
   el.querySelectorAll('button[data-nome]').forEach(b => b.addEventListener('click', () => openEdit(b.dataset.nome, b.dataset.titulo, b.dataset.tipo)));
@@ -870,9 +926,9 @@ function renderFieldsForm() {
   const el = document.getElementById('fieldsForm');
   let dadosHtml = f.dados.map((d, i) => `
     <div class="par">
-      <div class="campo"><label>Rótulo</label><input type="text" data-path="dados.${i}.label" value="${escapeHtml(d.label)}"></div>
-      <div class="campo"><label>Valor</label><input type="text" data-path="dados.${i}.valor" value="${escapeHtml(d.valor)}"></div>
-      <button class="mini" data-remove-dado="${i}" title="Remover">✕</button>
+      <div class="campo"><label>@@doc_l_rotulo@@</label><input type="text" data-path="dados.${i}.label" value="${escapeHtml(d.label)}"></div>
+      <div class="campo"><label>@@doc_l_valor@@</label><input type="text" data-path="dados.${i}.valor" value="${escapeHtml(d.valor)}"></div>
+      <button class="mini" data-remove-dado="${i}" title="@@doc_remover@@">✕</button>
     </div>`).join('');
 
   let secoesHtml = f.secoes.map((s, i) => {
@@ -882,31 +938,31 @@ function renderFieldsForm() {
         <div class="item-lista">
           <input type="text" data-path="secoes.${i}.itens.${j}" value="${escapeHtml(it)}">
           <button class="mini" data-remove-item="${i}:${j}">✕</button>
-        </div>`).join('') + `<button class="mini" data-add-item="${i}">+ item</button>`;
+        </div>`).join('') + `<button class="mini" data-add-item="${i}">@@doc_add_item@@</button>`;
     } else {
       corpo = `<div class="campo"><textarea data-path="secoes.${i}.corpo">${escapeHtml(s.corpo)}</textarea></div>`;
     }
     return `<div class="bloco">
       <div class="bloco-head">
-        <b>Seção ${i + 1}</b>
-        <button class="mini" data-remove-secao="${i}">Remover seção</button>
+        <b>@@doc_secao@@ ${i + 1}</b>
+        <button class="mini" data-remove-secao="${i}">@@doc_remover_secao@@</button>
       </div>
-      <div class="campo"><label>Título da seção</label><input type="text" data-path="secoes.${i}.titulo" value="${escapeHtml(s.titulo)}"></div>
+      <div class="campo"><label>@@doc_l_titulo_secao@@</label><input type="text" data-path="secoes.${i}.titulo" value="${escapeHtml(s.titulo)}"></div>
       ${corpo}
     </div>`;
   }).join('');
 
   el.innerHTML = `
-    <div class="campo"><label>Título do documento</label><input type="text" data-path="titulo" value="${escapeHtml(f.titulo)}"></div>
-    <div class="bloco"><div class="bloco-head"><b>Dados do paciente</b></div>${dadosHtml}
-      <button class="mini" data-add-dado="1">+ campo</button>
+    <div class="campo"><label>@@doc_l_titulo_doc@@</label><input type="text" data-path="titulo" value="${escapeHtml(f.titulo)}"></div>
+    <div class="bloco"><div class="bloco-head"><b>@@doc_dados_paciente@@</b></div>${dadosHtml}
+      <button class="mini" data-add-dado="1">@@doc_add_campo@@</button>
     </div>
     ${secoesHtml}
-    <button class="mini" data-add-secao="1" style="margin-bottom:12px">+ seção</button>
-    <div class="campo"><label>Pendências para o cirurgião confirmar</label><input type="text" data-path="pendencias" value="${escapeHtml(f.pendencias)}"></div>
+    <button class="mini" data-add-secao="1" style="margin-bottom:12px">@@doc_add_secao@@</button>
+    <div class="campo"><label>@@doc_l_pendencias@@</label><input type="text" data-path="pendencias" value="${escapeHtml(f.pendencias)}"></div>
     <div class="par">
-      <div class="campo"><label>Nome do cirurgião</label><input type="text" data-path="cirurgiao" value="${escapeHtml(f.cirurgiao)}"></div>
-      <div class="campo"><label>CRO</label><input type="text" data-path="cro" value="${escapeHtml(f.cro)}"></div>
+      <div class="campo"><label>@@doc_l_cirurgiao@@</label><input type="text" data-path="cirurgiao" value="${escapeHtml(f.cirurgiao)}"></div>
+      <div class="campo"><label>@@doc_l_conselho@@</label><input type="text" data-path="cro" value="${escapeHtml(f.cro)}"></div>
     </div>
   `;
 
@@ -922,13 +978,13 @@ function renderFieldsForm() {
     fieldsState.dados.splice(parseInt(b.dataset.removeDado), 1); renderFieldsForm();
   }));
   el.querySelector('[data-add-dado]')?.addEventListener('click', () => {
-    fieldsState.dados.push({label: 'Novo campo', valor: ''}); renderFieldsForm();
+    fieldsState.dados.push({label: '@@doc_novo_campo@@', valor: ''}); renderFieldsForm();
   });
   el.querySelectorAll('[data-remove-secao]').forEach((b) => b.addEventListener('click', () => {
     fieldsState.secoes.splice(parseInt(b.dataset.removeSecao), 1); renderFieldsForm();
   }));
   el.querySelector('[data-add-secao]')?.addEventListener('click', () => {
-    fieldsState.secoes.push({titulo: 'Nova seção', tipo: 'texto', corpo: '', itens: []}); renderFieldsForm();
+    fieldsState.secoes.push({titulo: '@@doc_nova_secao@@', tipo: 'texto', corpo: '', itens: []}); renderFieldsForm();
   });
   el.querySelectorAll('[data-add-item]').forEach((b) => b.addEventListener('click', () => {
     fieldsState.secoes[parseInt(b.dataset.addItem)].itens.push(''); renderFieldsForm();
@@ -943,7 +999,7 @@ function setModo(html) {
   modoHtml = html;
   document.getElementById('fieldsForm').style.display = html ? 'none' : (fieldsState ? '' : 'none');
   document.getElementById('fContent').style.display = html ? '' : 'none';
-  document.getElementById('btnToggleHtml').textContent = html ? '← voltar pro editor visual' : 'ver/editar HTML (avançado)';
+  document.getElementById('btnToggleHtml').textContent = html ? '@@doc_toggle_visual@@' : '@@doc_toggle_html@@';
 }
 
 async function openEdit(nome, titulo, tipo) {
@@ -951,13 +1007,13 @@ async function openEdit(nome, titulo, tipo) {
   editingTipo = tipo;
   fieldsState = null;
   document.getElementById('dlgTitle').textContent = titulo || nome;
-  document.getElementById('dlgStatus').textContent = 'Carregando...';
+  document.getElementById('dlgStatus').textContent = '@@doc_carregando@@';
   document.getElementById('dlgEdit').showModal();
   const btnToggle = document.getElementById('btnToggleHtml');
   const ehPedido = tipo === 'pedido';
   document.getElementById('btnSendGuia').style.display = ehPedido ? '' : 'none';
   document.getElementById('btnSendRelatorio').style.display = ehPedido ? '' : 'none';
-  document.getElementById('btnSendGroup').textContent = ehPedido ? '📲 Os dois' : '📲 Enviar PDF no grupo';
+  document.getElementById('btnSendGroup').textContent = ehPedido ? '@@doc_os_dois@@' : '@@doc_btn_enviar@@';
 
   if (tipo === 'documento' || tipo === 'pedido') {
     try {
@@ -968,14 +1024,14 @@ async function openEdit(nome, titulo, tipo) {
       // Num pedido, salvar aqui reescreve só a versão completa — a guia e o
       // relatório separados nascem do formulário, então é lá que se muda.
       document.getElementById('dlgStatus').textContent = ehPedido
-        ? 'Isto é um pedido de cirurgia: para mudar os dados use "Refazer no formulário" (aqui você só ajusta o texto da versão completa).'
+        ? '@@doc_aviso_pedido@@'
         : '';
     } catch (e) {
       btnToggle.style.display = 'none';
       const data = await api('/documentos/api/' + nome + '/content');
       document.getElementById('fContent').value = data.content;
       setModo(true);
-      document.getElementById('dlgStatus').textContent = 'Essa página não tem o formato reconhecido — editando o HTML direto.';
+      document.getElementById('dlgStatus').textContent = '@@doc_sem_formato@@';
     }
   } else {
     btnToggle.style.display = 'none';
@@ -998,18 +1054,18 @@ document.getElementById('btnCancel').addEventListener('click', () => document.ge
 document.getElementById('btnOpen').addEventListener('click', () => window.open('/s/' + editingNome, '_blank'));
 document.getElementById('btnSave').addEventListener('click', async () => {
   const st = document.getElementById('dlgStatus');
-  st.textContent = 'Salvando...';
+  st.textContent = '@@doc_salvando@@';
   try {
     if (modoHtml || !fieldsState) {
       await api('/documentos/api/' + editingNome + '/content', {method: 'PUT', body: JSON.stringify({content: document.getElementById('fContent').value})});
     } else {
       await api('/documentos/api/' + editingNome + '/fields', {method: 'PUT', body: JSON.stringify(fieldsState)});
     }
-    st.textContent = '✅ Salvo.';
-  } catch (e) { st.textContent = '❌ Falha ao salvar.'; }
+    st.textContent = '@@doc_salvo@@';
+  } catch (e) { st.textContent = '@@doc_falha_salvar@@'; }
 });
 document.getElementById('btnDelete').addEventListener('click', async () => {
-  if (!confirm('Excluir "' + editingNome + '"? (fica guardado como cópia de segurança)')) return;
+  if (!confirm('@@doc_conf_excluir_a@@' + editingNome + '@@doc_conf_excluir_b@@')) return;
   await api('/documentos/api/' + editingNome, {method: 'DELETE'});
   document.getElementById('dlgEdit').close();
   load();
@@ -1019,12 +1075,12 @@ document.getElementById('btnDelete').addEventListener('click', async () => {
 // pra mandar cada uma sozinha — o portal costuma pedir um arquivo por peça.
 async function enviarPdf(parte) {
   const st = document.getElementById('dlgStatus');
-  const nome = parte === 'guia' ? 'a guia' : (parte === 'relatorio' ? 'o relatório' : 'o PDF');
-  st.textContent = 'Gerando ' + nome + ' e enviando no grupo...';
+  const nome = parte === 'guia' ? '@@doc_a_guia@@' : (parte === 'relatorio' ? '@@doc_o_rel@@' : '@@doc_o_pdf@@');
+  st.textContent = '@@doc_gerando_a@@' + nome + '@@doc_gerando_b@@';
   try {
     await api('/documentos/api/' + editingNome + '/send-group' + (parte ? ('?parte=' + parte) : ''), {method: 'POST'});
-    st.textContent = '✅ Enviei ' + nome + ' no grupo.';
-  } catch (e) { st.textContent = '❌ Falha ao enviar — confira se o WhatsApp está conectado.'; }
+    st.textContent = '@@doc_enviei_a@@' + nome + '@@doc_enviei_b@@';
+  } catch (e) { st.textContent = '@@doc_falha_enviar@@'; }
 }
 document.getElementById('btnSendGroup').addEventListener('click', () => enviarPdf(''));
 document.getElementById('btnSendGuia').addEventListener('click', () => enviarPdf('guia'));
@@ -1035,6 +1091,11 @@ load();
 </body>
 </html>
 """
+
+
+def docs_page():
+    """A tela de documentos, montada no idioma da instalacao."""
+    return _no_idioma(DOCS_PAGE)
 
 
 class H(BaseHTTPRequestHandler):
@@ -1081,7 +1142,7 @@ class H(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
 
         if path in ("/crm", "/crm/"):
-            body = PAGE.encode()
+            body = page().encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -1124,7 +1185,7 @@ class H(BaseHTTPRequestHandler):
             )
 
         if path in ("/documentos", "/documentos/"):
-            body = DOCS_PAGE.encode()
+            body = docs_page().encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))

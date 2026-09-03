@@ -33,7 +33,7 @@ import os
 import re
 import time
 
-import pedido_es
+import idioma_es as pedido_es
 
 # ============================================================== IDIOMA / PAIS
 # Sao duas coisas diferentes e nao devem ser amarradas:

@@ -1,0 +1,91 @@
+{
+ "tipo": "ortognatica",
+ "pais": "ve",
+ "dni": "V-12.345.678",
+ "tipo_livre": "",
+ "paciente": "María Ficticia",
+ "idade": "27",
+ "convenio": "Seguros Caracas",
+ "carteirinha": "HCM-4471982",
+ "plano": "",
+ "validade_carteira": "",
+ "cns": "",
+ "maloclusao": "maloclusión clase II",
+ "associados": [
+  "síndrome de apnea obstructiva del sueño",
+  "dificultad masticatoria"
+ ],
+ "exames": [
+  "Tomografía computarizada de haz cónico (CBCT)",
+  "Telerradiografía lateral con trazado cefalométrico",
+  "Documentación ortodóncica completa",
+  "Polisomnografía"
+ ],
+ "hospital": "Centro Médico de Ejemplo",
+ "codigo_hospital": "",
+ "codigo_operadora": "",
+ "contratado": "",
+ "cnes": "",
+ "cid": "K07.2",
+ "cid_desc": "Anomalías de la relación entre los arcos dentarios",
+ "cid2": "",
+ "tipo_doenca": "",
+ "tempo_doenca": "",
+ "carater": "E",
+ "tipo_internacao": "2",
+ "regime": "1",
+ "diarias": "02",
+ "data_procedimento": "2026-10-15",
+ "cirurgiao": "Dr./Dra. [nombre del cirujano]",
+ "cro": "",
+ "uf": "",
+ "observacao": "No necesariamente se utilizará todo el material solicitado. Ejemplo de demostración — paciente y datos ficticios.",
+ "indicacao": "",
+ "justificativa": "",
+ "conduta": "",
+ "fornecedores": [
+  "KLS MARTIN",
+  "STRYKER CMF",
+  "MEDARTIS"
+ ],
+ "procedimentos": [
+  {
+   "codigo": "",
+   "desc": "OSTEOTOMÍA LE FORT I",
+   "qtd": "01"
+  },
+  {
+   "codigo": "",
+   "desc": "OSTEOTOMÍA SAGITAL DE RAMA MANDIBULAR",
+   "qtd": "01"
+  },
+  {
+   "codigo": "",
+   "desc": "OSTEOPLASTIA DE MANDÍBULA",
+   "qtd": "01"
+  }
+ ],
+ "materiais": [
+  {
+   "desc": "Miniplacas premoldeadas / maxilar",
+   "qtd": "02"
+  },
+  {
+   "desc": "Tornillos 1.5 / 2.0",
+   "qtd": "44"
+  },
+  {
+   "desc": "Placa recta 2.0",
+   "qtd": "04"
+  },
+  {
+   "desc": "Punta ultrasónica piezoeléctrica",
+   "qtd": "01"
+  },
+  {
+   "desc": "Sierra reciprocante",
+   "qtd": "01"
+  }
+ ],
+ "_exemplo": true
+}

@@ -281,8 +281,16 @@ fi
 # ---------------------------------------------------------------------------
 if [ -d /opt/copiloto/sites_padrao ]; then
   mkdir -p "$FAB/sites_padrao"
+  # COPILOTO_IDIOMA=es serve a pagina de exemplo em espanhol quando ela existe.
+  # Fallback por PAGINA (nao pela pasta): a vitrine do produto so' existe em
+  # PT-BR, e um `continue` a faria sumir da instalacao hispana em vez de vir no
+  # idioma que temos.
+  DIR_ES=/opt/copiloto/sites_padrao_es
   for nome in agente-cobrac exemplo-documento exemplo-solicitacao-convenio; do
     ORIG="/opt/copiloto/sites_padrao/$nome"
+    case "$(printf %s "${COPILOTO_IDIOMA:-pt}" | tr A-Z a-z)" in
+      es*) [ -d "$DIR_ES/$nome" ] && ORIG="$DIR_ES/$nome" ;;
+    esac
     [ -d "$ORIG" ] || continue
     VIVO="$DATA/sites/$nome"
     BASE="$FAB/sites_padrao/$nome"
