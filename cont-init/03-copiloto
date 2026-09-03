@@ -40,6 +40,9 @@ if [ -z "$S" ]; then S=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'); f
 ESCOLHA=$(/opt/hermes/.venv/bin/python /opt/copiloto/escolher-modelo.py 2>>"$DATA/modelo-setup.log")
 MODEL_PROVIDER=$(echo "$ESCOLHA" | sed -n 's/^provider=//p' | tail -1)
 MODEL_DEFAULT=$(echo "$ESCOLHA" | sed -n 's/^default=//p' | tail -1)
+# A rede de seguranca: modelos das familias ABAIXO do principal, na ordem em
+# que devem ser tentados. Vazio quando nao ha para onde descer.
+MODEL_FALLBACK=$(echo "$ESCOLHA" | sed -n 's/^fallback=//p' | tail -1)
 if [ -z "$MODEL_PROVIDER" ]; then MODEL_PROVIDER=openai-api; fi
 if [ -z "$MODEL_DEFAULT" ]; then MODEL_DEFAULT=gpt-5; fi
 
@@ -455,7 +458,7 @@ esac
 # no primeiro boot, entao sem isto quem ja tinha instalacao no ar colaria a
 # ANTHROPIC_API_KEY na stack e continuaria rodando gpt-5 sem entender por que.
 /opt/hermes/.venv/bin/python /opt/copiloto/escolher-modelo.py --aplicar \
-  "$MODEL_PROVIDER" "$MODEL_DEFAULT" 2>>"$DATA/modelo-setup.log" || true
+  "$MODEL_PROVIDER" "$MODEL_DEFAULT" "$MODEL_FALLBACK" 2>>"$DATA/modelo-setup.log" || true
 
 # Acesso do agente ao servidor (SSH root no host). Ligado por padrao; depende
 # do volume /root/.ssh na stack. Desliga com COPILOTO_HOST_SSH=off.

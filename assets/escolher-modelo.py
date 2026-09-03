@@ -14,6 +14,18 @@ continua acertando o modelo daqui a seis meses, sem rebuild.
 
 COPILOTO_MODELO=<id> manda em tudo (ex: trocar Sonnet por Opus).
 Sai 0 sempre; qualquer falha cai no padrao e o boot segue.
+
+Alem do modelo principal, monta a CADEIA DE FALLBACK (fallback_providers no
+config.yaml): se o principal ficar indisponivel no meio de uma resposta — cota
+do plano estourada, provedor sobrecarregado, 500 —, o Hermes desce para o
+proximo da cadeia NA HORA, na mesma resposta, e avisa uma vez no grupo o que
+trocou e por que.
+
+E' por isso que a cadeia desce de familia (opus -> sonnet -> haiku) em vez de
+repetir o mesmo modelo: o motivo mais comum de queda aqui e' justamente cota
+esgotada DAQUELE modelo, e o Haiku costuma ter limite proprio, mais folgado.
+Um cirurgiao com o copiloto mudo no meio do expediente e' pior do que um
+copiloto respondendo com o modelo menor.
 """
 import json
 import os
@@ -95,40 +107,74 @@ def lista_modelos(chave):
     return [m.get("id", "") for m in corpo.get("data", []) if m.get("id")]
 
 
+# Da familia mais forte para a mais fraca. `fable` fica fora de proposito: e'
+# experimental, e rede de seguranca nao e' lugar de surpresa.
+FAMILIAS = ("opus", "sonnet", "haiku")
+
+
+def cadeia_fallback(ids, principal):
+    """Os melhores modelos das familias ABAIXO da do principal.
+
+    Devolve lista de ids, ja na ordem em que devem ser tentados. Vazia quando o
+    principal ja e' a familia mais fraca — nesse caso nao ha para onde descer,
+    e uma cadeia falsa so' faria o Hermes tentar duas vezes o que ja falhou.
+    """
+    familia_principal = next((f for f in FAMILIAS if ("claude-%s" % f) in principal), "")
+    if not familia_principal:
+        return []
+    abaixo = FAMILIAS[FAMILIAS.index(familia_principal) + 1:]
+    cadeia = []
+    for familia in abaixo:
+        candidatos = [i for i in ids if ("claude-%s" % familia) in i]
+        if candidatos:
+            melhor = sorted(candidatos, key=peso, reverse=True)[0]
+            if melhor != principal:
+                cadeia.append(melhor)
+    return cadeia
+
+
 def escolhe_claude(chave):
-    """(modelo, motivo). Nunca levanta excecao."""
+    """(modelo, motivo, cadeia_de_fallback). Nunca levanta excecao.
+
+    A cadeia so' existe quando conseguimos LISTAR os modelos da conta: sem a
+    lista nao ha como saber o que existe, e inventar um id de fallback poe o
+    Hermes a tentar um modelo inexistente na hora do aperto."""
     forcado = limpa_texto(os.environ.get("COPILOTO_MODELO"))
     try:
         ids = lista_modelos(chave)
     except urllib.error.HTTPError as e:
-        return ("", "a chave da Anthropic foi recusada (HTTP %s)" % e.code)
+        return ("", "a chave da Anthropic foi recusada (HTTP %s)" % e.code, [])
     except Exception as e:
         # Rede fora no boot nao pode custar o cerebro bom: seguimos com o
         # fallback, que so erra se a Anthropic aposentar o modelo.
         if forcado:
-            return (forcado, "sem resposta da API (%s); usando o modelo pedido na stack" % e)
-        return (FALLBACK_ANTHROPIC, "sem resposta da API (%s); usando o padrao embutido" % e)
+            return (forcado, "sem resposta da API (%s); usando o modelo pedido na stack" % e, [])
+        return (FALLBACK_ANTHROPIC, "sem resposta da API (%s); usando o padrao embutido" % e, [])
 
     if forcado:
         if forcado in ids:
-            return (forcado, "modelo pedido na stack")
+            return (forcado, "modelo pedido na stack", cadeia_fallback(ids, forcado))
         parciais = sorted([i for i in ids if forcado in i], key=peso, reverse=True)
         if parciais:
-            return (parciais[0], "modelo pedido na stack (resolvido para o mais novo)")
+            return (parciais[0], "modelo pedido na stack (resolvido para o mais novo)",
+                    cadeia_fallback(ids, parciais[0]))
         return (FALLBACK_ANTHROPIC,
-                "COPILOTO_MODELO='%s' nao existe nesta conta; usando o padrao" % forcado)
+                "COPILOTO_MODELO='%s' nao existe nesta conta; usando o padrao" % forcado,
+                cadeia_fallback(ids, FALLBACK_ANTHROPIC))
 
     for familia in (familia_preferida(chave), "sonnet", "opus"):
         candidatos = [i for i in ids if ("claude-%s" % familia) in i]
         if candidatos:
             melhor = sorted(candidatos, key=peso, reverse=True)[0]
-            return (melhor, "melhor %s disponivel na conta" % familia)
+            return (melhor, "melhor %s disponivel na conta" % familia,
+                    cadeia_fallback(ids, melhor))
     if ids:
-        return (sorted(ids, key=peso, reverse=True)[0], "unico disponivel na conta")
-    return ("", "a conta nao listou nenhum modelo")
+        melhor = sorted(ids, key=peso, reverse=True)[0]
+        return (melhor, "unico disponivel na conta", cadeia_fallback(ids, melhor))
+    return ("", "a conta nao listou nenhum modelo", [])
 
 
-def aplicar(provider, modelo):
+def aplicar(provider, modelo, fallback=""):
     """Grava o cerebro escolhido no config.yaml VIVO.
 
     O config.yaml so nasce no primeiro boot, entao sem isto uma instalacao que
@@ -142,18 +188,38 @@ def aplicar(provider, modelo):
             cfg = yaml.safe_load(fh) or {}
     except Exception:
         return
+    # A cadeia vive no TOPO do config (fallback_providers), nao dentro de
+    # model: — e' onde o Hermes a le (hermes_cli/fallback_config.py).
+    cadeia = [
+        {"provider": provider, "model": m}
+        for m in [x.strip() for x in (fallback or "").split(",") if x.strip()]
+    ]
     atual = cfg.get("model") or {}
-    if atual.get("provider") == provider and atual.get("default") == modelo:
+    igual = (
+        atual.get("provider") == provider
+        and atual.get("default") == modelo
+        and (cfg.get("fallback_providers") or []) == cadeia
+    )
+    if igual:
         print("modelo=inalterado", file=sys.stderr)
         return
     atual["provider"] = provider
     atual["default"] = modelo
     cfg["model"] = atual
+    if cadeia:
+        cfg["fallback_providers"] = cadeia
+    else:
+        # Sem cadeia, REMOVE a antiga: um fallback que sobrou de outra conta
+        # aponta para um modelo que esta credencial talvez nem liste.
+        cfg.pop("fallback_providers", None)
     tmp = caminho + ".tmp"
     with open(tmp, "w") as fh:
         yaml.safe_dump(cfg, fh, sort_keys=False, allow_unicode=True)
     os.replace(tmp, caminho)
-    print("modelo=atualizado para %s/%s" % (provider, modelo), file=sys.stderr)
+    print("modelo=atualizado para %s/%s%s" % (
+        provider, modelo,
+        (" (rede de seguranca: " + ", ".join(c["model"] for c in cadeia) + ")") if cadeia else ""
+    ), file=sys.stderr)
 
 
 def preferencia():
@@ -176,7 +242,7 @@ def preferencia():
 
 def main():
     if len(sys.argv) > 3 and sys.argv[1] == "--aplicar":
-        aplicar(sys.argv[2], sys.argv[3])
+        aplicar(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else "")
         return
 
     pref = preferencia()
@@ -193,6 +259,7 @@ def main():
         modelo = limpa_texto(pref.get("modelo")) or FALLBACK_OPENAI
         print("provider=openai-api")
         print("default=%s" % modelo)
+        print("fallback=")
         print("motivo=OpenAI escolhido no grupo (cerebro.json)", file=sys.stderr)
         return
 
@@ -200,18 +267,24 @@ def main():
         modelo = limpa_texto(os.environ.get("COPILOTO_MODELO")) or FALLBACK_OPENAI
         print("provider=openai-api")
         print("default=%s" % modelo)
+        print("fallback=")
         print("motivo=sem chave da Anthropic — seguindo no OpenAI", file=sys.stderr)
         return
 
-    modelo, motivo = escolhe_claude(chave)
+    modelo, motivo, cadeia = escolhe_claude(chave)
     if not modelo:
         print("provider=openai-api")
         print("default=%s" % FALLBACK_OPENAI)
+        print("fallback=")
         print("motivo=%s — voltando para o OpenAI" % motivo, file=sys.stderr)
         return
     print("provider=anthropic")
     print("default=%s" % modelo)
-    print("motivo=Claude ligado (%s): %s" % (modelo, motivo), file=sys.stderr)
+    print("fallback=%s" % ",".join(cadeia))
+    print("motivo=Claude ligado (%s): %s%s" % (
+        modelo, motivo,
+        ("; rede de seguranca: " + ", ".join(cadeia)) if cadeia else "; sem rede de seguranca"
+    ), file=sys.stderr)
 
 
 if __name__ == "__main__":
@@ -220,4 +293,5 @@ if __name__ == "__main__":
     except Exception as e:  # nunca derruba o boot
         print("provider=openai-api")
         print("default=%s" % FALLBACK_OPENAI)
+        print("fallback=")
         print("motivo=erro inesperado (%s)" % e, file=sys.stderr)
