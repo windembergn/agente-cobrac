@@ -1090,7 +1090,9 @@ class H(BaseHTTPRequestHandler):
             return
 
         if path in ("/crm/pedido", "/crm/pedido/"):
-            body = pedido_mod.FORM_PAGE.encode()
+            # form_page() e nao FORM_PAGE: a tela e montada no idioma da
+            # instalacao (COPILOTO_IDIOMA) a cada requisicao.
+            body = pedido_mod.form_page().encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))

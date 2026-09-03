@@ -33,6 +33,55 @@ import os
 import re
 import time
 
+import pedido_es
+
+# ============================================================== IDIOMA / PAIS
+# Sao duas coisas diferentes e nao devem ser amarradas:
+#
+#   IDIOMA  — a lingua da tela e dos documentos. Vale para a instalacao
+#             inteira (COPILOTO_IDIOMA=es na stack), porque quem opera o
+#             sistema e' sempre a mesma pessoa.
+#   PAIS    — qual formulario a operadora espera. Escolhido em CADA pedido,
+#             porque a mesma cirurgia pode ir para um convenio brasileiro
+#             hoje e para uma aseguradora hispano-americana amanha.
+#
+# Sao tres paises hoje: `br` sai na guia TISS/ANS; `ve` e `es` saem na mesma
+# Solicitud de Autorizacion (o impresso e' o mesmo, mudam as seguradoras e
+# tres rotulos). Pais novo entra em pedido_es.ASEGURADORAS_POR_PAIS.
+#
+# O default dos dois e' o Brasil/PT-BR: uma instalacao que ja existe nao muda
+# de comportamento ao atualizar a imagem.
+PAISES = ("br", "ve", "es")
+
+
+def idioma():
+    v = (os.environ.get("COPILOTO_IDIOMA") or "pt").strip().lower()[:2]
+    return "es" if v == "es" else "pt"
+
+
+def T(idi=None):
+    """Os rotulos do idioma em vigor (o PT-BR cobre o que faltar em ES)."""
+    return pedido_es.textos(idi or idioma())
+
+
+def pais_padrao():
+    """O pais que a tela ja vem marcando.
+
+    COPILOTO_PAIS na stack manda. Sem ele, o idioma decide — mas so' entre
+    Brasil e Espanha, porque nao da' para adivinhar QUAL pais hispano: uma
+    cirurgia venezuelana e uma espanhola falam a mesma lingua e usam
+    seguradoras completamente diferentes. Quem instala para a Venezuela poe
+    COPILOTO_PAIS=ve e para de pensar nisso."""
+    v = (os.environ.get("COPILOTO_PAIS") or "").strip().lower()
+    if v in PAISES:
+        return v
+    return "es" if idioma() == "es" else "br"
+
+
+def pais_do(p):
+    v = (p.get("pais") or pais_padrao()).strip().lower()
+    return v if v in PAISES else "br"
+
 # ============================================================== CATALOGO
 # Cada tipo de cirurgia traz o que muda no pedido: CID sugerido, procedimentos,
 # materiais tipicos e o texto-base da justificativa. Tudo editavel na tela.
@@ -397,47 +446,104 @@ MESES = [
 ]
 
 
-def catalogo():
-    """O que a tela precisa para montar os cliques."""
+def _traduz_cirurgia(c, idi):
+    """A mesma cirurgia com os textos na lingua pedida.
+
+    Codigo TUSS, CID, diarias, regime e quantidades NAO sao traduzidos — sao os
+    mesmos numeros nos dois paises. Por isso o catalogo espanhol guarda so' as
+    strings, e uma cirurgia nova continua entrando em um lugar so'."""
+    if idi != "es":
+        return c
+    es = pedido_es.CIRURGIAS_ES.get(c["key"])
+    if not es:
+        return c
+    d = dict(c)
+    d["nome"] = es["nome"]
+    d["cid_desc"] = es.get("cid_desc", c.get("cid_desc", ""))
+    d["indicacao"] = es.get("indicacao", "")
+    d["justificativa"] = es.get("justificativa", "")
+    d["conduta"] = es.get("conduta", "")
+    # As listas andam em paralelo com as do PT-BR: mesma ordem, mesmo tamanho.
+    # Se um dia sairem de sincronia, o zip corta no menor e o que sobra fica no
+    # original — nunca troca a descricao de um procedimento pela de outro.
+    d["procedimentos"] = [
+        {**pr, "desc": desc}
+        for pr, desc in zip(c["procedimentos"], es.get("procedimentos", []))
+    ] or c["procedimentos"]
+    d["materiais"] = [
+        {**m, "desc": desc}
+        for m, desc in zip(c["materiais"], es.get("materiais", []))
+    ] or c["materiais"]
+    return d
+
+
+def catalogo(idi=None):
+    """O que a tela precisa para montar os cliques, na lingua em vigor.
+
+    `convenios` vem separado por pais: a tela troca a lista inteira quando o
+    cirurgiao muda o pais do tramite, sem ir ao servidor de novo."""
+    idi = idi or idioma()
+    es = idi == "es"
     return {
-        "cirurgias": CIRURGIAS,
-        "maloclusoes": MALOCLUSOES,
-        "associados": ASSOCIADOS,
-        "exames": EXAMES,
+        "idioma": idi,
+        # Os chips do bloco 0. Rotulo ja traduzido: a tela nao decide nome de pais.
+        "paises": [(k, T(idi)["pais_" + k]) for k in PAISES],
+        "cirurgias": [_traduz_cirurgia(c, idi) for c in CIRURGIAS],
+        "maloclusoes": pedido_es.MALOCLUSOES_ES if es else MALOCLUSOES,
+        "associados": pedido_es.ASSOCIADOS_ES if es else ASSOCIADOS,
+        "exames": pedido_es.EXAMES_ES if es else EXAMES,
         "convenios": CONVENIOS,
+        "convenios_por_pais": dict({"br": CONVENIOS}, **pedido_es.ASEGURADORAS_POR_PAIS),
         "fornecedores": FORNECEDORES_PADRAO,
-        "carater": CARATER,
-        "tipo_internacao": TIPO_INTERNACAO,
-        "regime": REGIME,
+        "fornecedores_por_pais": {
+            "br": FORNECEDORES_PADRAO,
+            "ve": pedido_es.FABRICANTES_ES,
+            "es": pedido_es.FABRICANTES_ES,
+        },
+        "carater": pedido_es.CARATER_ES if es else CARATER,
+        "tipo_internacao": pedido_es.TIPO_INTERNACAO_ES if es else TIPO_INTERNACAO,
+        "regime": pedido_es.REGIME_ES if es else REGIME,
     }
 
 
-def _cirurgia(key):
+def _cirurgia(key, idi=None):
     for c in CIRURGIAS:
         if c["key"] == key:
-            return c
-    return CIRURGIAS[-1]
+            return _traduz_cirurgia(c, idi or idioma())
+    return _traduz_cirurgia(CIRURGIAS[-1], idi or idioma())
 
 
 # ============================================================== TEXTO CLINICO
-def _lista_por_extenso(itens):
+def _lista_por_extenso(itens, idi=None):
     itens = [i for i in itens if i]
     if not itens:
         return ""
     if len(itens) == 1:
         return itens[0]
-    return ", ".join(itens[:-1]) + " e " + itens[-1]
+    # "y" vira "e" antes de som de i- ("e implantes"), regra do espanhol.
+    if (idi or idioma()) == "es":
+        ultimo = itens[-1]
+        conj = " e " if re.match(r"^[iíhI]", ultimo.strip()) else " y "
+    else:
+        conj = " e "
+    return ", ".join(itens[:-1]) + conj + itens[-1]
 
 
-def _frase_associados(associados):
-    txt = _lista_por_extenso(associados)
-    return f", com quadro associado de {txt}" if txt else ""
+def _frase_associados(associados, idi=None):
+    idi = idi or idioma()
+    txt = _lista_por_extenso(associados, idi)
+    if not txt:
+        return ""
+    rotulo = ", con cuadro asociado de " if idi == "es" else ", com quadro associado de "
+    return rotulo + txt
 
 
-def _frase_maloclusao(maloclusao, cirurgia):
+def _frase_maloclusao(maloclusao, cirurgia, idi=None):
     if maloclusao:
         return maloclusao + ","
-    return "alteração esquelética," if cirurgia.get("pede_maloclusao") else ""
+    if not cirurgia.get("pede_maloclusao"):
+        return ""
+    return "alteración esquelética," if (idi or idioma()) == "es" else "alteração esquelética,"
 
 
 def montar_textos(p):
@@ -445,10 +551,11 @@ def montar_textos(p):
 
     Se o pedido vier com texto proprio (o agente escreveu no WhatsApp, ou o
     cirurgiao editou na tela), o texto proprio ganha — nunca sobrescrevemos."""
-    c = _cirurgia(p.get("tipo", ""))
+    idi = idioma()
+    c = _cirurgia(p.get("tipo", ""), idi)
     ctx = {
-        "maloclusao": _frase_maloclusao(p.get("maloclusao", ""), c),
-        "associados_frase": _frase_associados(p.get("associados", [])),
+        "maloclusao": _frase_maloclusao(p.get("maloclusao", ""), c, idi),
+        "associados_frase": _frase_associados(p.get("associados", []), idi),
     }
 
     def fmt(tpl):
@@ -468,6 +575,7 @@ def slug_do_pedido(p):
     nome = nome.replace("ã", "a").replace("á", "a").replace("â", "a").replace("à", "a")
     nome = nome.replace("é", "e").replace("ê", "e").replace("í", "i").replace("ó", "o")
     nome = nome.replace("ô", "o").replace("õ", "o").replace("ú", "u").replace("ç", "c")
+    nome = nome.replace("ñ", "n").replace("ü", "u")
     nome = re.sub(r"[^a-z0-9]+", "-", nome).strip("-")
     partes = [x for x in nome.split("-") if x][:3]
     base = "pedido-" + ("-".join(partes) or "paciente")
@@ -480,16 +588,23 @@ def _e(s):
 
 
 def _campo(num, rotulo, valor="", classe=""):
+    """Uma celula do formulario. `num` vazio = sem numeracao de campo.
+
+    A guia brasileira numera os campos porque a ANS numera; a solicitud hispana
+    nao numera nada, e um travessao solto na frente do rotulo denunciaria o
+    molde emprestado."""
     v = _e(valor) or '<span class="linha-vazia"></span>'
+    titulo = f"{_e(num)} — {_e(rotulo)}" if str(num).strip() else _e(rotulo)
     return (
-        f'<td class="{classe}"><span class="campo-num">{_e(num)} — {_e(rotulo)}</span>'
+        f'<td class="{classe}"><span class="campo-num">{titulo}</span>'
         f'<span class="campo-valor">{v}</span></td>'
     )
 
 
-def _data_extenso(ts=None):
+def _data_extenso(ts=None, idi=None):
     t = time.localtime(ts or time.time())
-    return f"{t.tm_mday} de {MESES[t.tm_mon - 1]} de {t.tm_year}"
+    meses = pedido_es.MESES_ES if (idi or idioma()) == "es" else MESES
+    return f"{t.tm_mday} de {meses[t.tm_mon - 1]} de {t.tm_year}"
 
 
 def _data_br(iso):
@@ -525,106 +640,379 @@ def _bloco_opme(p):
     return "\n".join(linhas) or "<tr><td colspan='6'>&nbsp;</td></tr>"
 
 
-def _pendencias(p):
+def _pendencias(p, t=None):
+    t = t or T()
     faltando = []
     if not (p.get("carteirinha") or "").strip():
-        faltando.append("número da carteirinha")
+        faltando.append(t["p_carteirinha"])
     if not (p.get("cro") or "").strip():
-        faltando.append("CRO do solicitante")
+        faltando.append(t["p_conselho"])
     if not (p.get("cid") or "").strip():
-        faltando.append("CID-10")
+        faltando.append(t["p_cid"])
     if not (p.get("hospital") or "").strip():
-        faltando.append("hospital")
+        faltando.append(t["p_hospital"])
     if not (p.get("data_procedimento") or "").strip():
-        faltando.append("data do procedimento")
+        faltando.append(t["p_data"])
     sem_codigo = [
         pr.get("desc")
         for pr in p.get("procedimentos", [])
         if pr.get("desc") and not (pr.get("codigo") or "").strip()
     ]
     if sem_codigo:
-        faltando.append("código do procedimento na tabela da operadora (" + ", ".join(sem_codigo[:3]) + ")")
-    return "; ".join(faltando) if faltando else "nenhuma"
+        faltando.append(t["p_codigo"] + " (" + ", ".join(sem_codigo[:3]) + ")")
+    return "; ".join(faltando) if faltando else t["p_nenhuma"]
 
 
 PARTES = ("completo", "guia", "relatorio")
 
-_TITULO_PARTE = {
-    "completo": "Solicitação de cirurgia",
-    "guia": "Guia de solicitação de internação",
-    "relatorio": "Relatório médico para solicitação",
-}
+
+def _titulo_parte(parte, t):
+    return {"completo": t["doc_completo"], "guia": t["doc_guia"], "relatorio": t["doc_relatorio"]}[parte]
+
+
+def _valores(p, idi):
+    """Tudo que os dois formularios (BR e ES) leem, ja limpo e formatado.
+
+    Existe para que a guia brasileira e a solicitud espanhola nunca divirjam no
+    conteudo: as duas se abastecem daqui, e o que muda entre elas e' so' o
+    papel — quais campos aparecem, com que rotulo e em que ordem."""
+    t = T(idi)
+    c = _cirurgia(p.get("tipo", ""), idi)
+    indicacao, justificativa, conduta = montar_textos(p)
+
+    paciente = p.get("paciente") or t["paciente_confirmar"]
+    idade = (p.get("idade") or "").strip()
+    convenio = (p.get("convenio") or "").strip()
+    carteirinha = (p.get("carteirinha") or "").strip()
+    cid = (p.get("cid") or "").strip()
+    cid_desc = (p.get("cid_desc") or c.get("cid_desc") or "").strip()
+    cro = (p.get("cro") or t["a_confirmar"]).strip()
+
+    return {
+        "t": t,
+        "c": c,
+        "titulo_cirurgia": (p.get("tipo_livre") or "").strip() or c["nome"],
+        "paciente": paciente,
+        "paciente_linha": f"{paciente}, {idade}{t['anos']}" if idade else paciente,
+        "idade": idade,
+        "convenio": convenio,
+        "carteirinha": carteirinha,
+        "convenio_linha": t["carteirinha_sep"].join([x for x in [convenio, carteirinha] if x]) or t["a_confirmar"],
+        "cid": cid,
+        "cid_desc": cid_desc,
+        "cid_linha": " — ".join([x for x in [cid, cid_desc] if x]) or t["cid_confirmar"],
+        "cid2": (p.get("cid2") or "").strip(),
+        "indicacao": indicacao,
+        "justificativa": justificativa,
+        "conduta": conduta,
+        "procs_txt": "; ".join(
+            [
+                " ".join([x for x in [pr.get("desc", "").strip(),
+                                      f"({pr.get('codigo')})" if pr.get("codigo") else ""] if x])
+                for pr in p.get("procedimentos", []) if pr.get("desc")
+            ]
+        ) or t["a_confirmar"],
+        "materiais_li": "\n      ".join(
+            f"<li>{_e(m.get('desc'))} — {_e(m.get('qtd'))}</li>"
+            for m in p.get("materiais", []) if m.get("desc")
+        ) or f"<li>{t['sem_material']}</li>",
+        "exames_li": "\n      ".join(f"<li>{_e(x)}</li>" for x in p.get("exames", []))
+                     or f"<li>{t['sem_exame']}</li>",
+        "forn_txt": _lista_por_extenso([f for f in p.get("fornecedores", []) if f], idi),
+        "data_proc": _data_br(p.get("data_procedimento", "")),
+        "cirurgiao": (p.get("cirurgiao") or t["nome_cirurgiao"]).strip(),
+        "cro": cro,
+        "uf": (p.get("uf") or "").strip(),
+        "hospital": (p.get("hospital") or "").strip(),
+        "obs": (p.get("observacao") or t["obs_padrao"]).strip(),
+        "carater_lbl": dict(pedido_es.CARATER_ES if idi == "es" else CARATER).get(p.get("carater", "E"), ""),
+        "tipo_int_lbl": dict(pedido_es.TIPO_INTERNACAO_ES if idi == "es" else TIPO_INTERNACAO).get(
+            p.get("tipo_internacao", c["tipo_internacao"]), ""),
+        "regime_lbl": dict(pedido_es.REGIME_ES if idi == "es" else REGIME).get(
+            p.get("regime", c["regime"]), ""),
+        "diarias": p.get("diarias", c["diarias"]),
+    }
+
+
+def _guia_br(p, v):
+    """A guia de solicitacao de internacao no padrao TISS/ANS (Brasil).
+
+    Numeracao dos campos preservada: e' por ela que o atendente da operadora se
+    guia no balcao, entao ela nao muda nem quando a tela esta em espanhol."""
+    t = v["t"]
+    return f"""
+<article class="documento guia">
+
+  <table class="guia-topo">
+    <tr>
+      <td class="operadora">{_e(v["convenio"]) or t["g_operadora"]}</td>
+      <td class="titulo-guia">{t["g_titulo"]}</td>
+      {_campo("2", t["g_num_guia"])}
+    </tr>
+  </table>
+
+  <table>
+    <tr>
+      {_campo("1", t["g_ans"])}
+      {_campo("3", t["g_data_aut"])}
+      {_campo("4", t["g_senha"])}
+      {_campo("5", t["g_validade_senha"])}
+      {_campo("6", t["g_emissao"], _data_br(time.strftime("%Y-%m-%d")))}
+    </tr>
+  </table>
+
+  <p class="titulo-bloco">{t["g_bloco_benef"]}</p>
+  <table>
+    <tr>
+      {_campo("7", t["g_carteira"], v["carteirinha"])}
+      {_campo("8", t["g_plano"], p.get("plano", ""))}
+      {_campo("9", t["g_validade_carteira"], _data_br(p.get("validade_carteira", "")))}
+    </tr>
+    <tr>
+      {_campo("10", t["g_nome"], v["paciente"])}
+      {_campo("11", t["g_cns"], p.get("cns", ""), "col2")}
+    </tr>
+  </table>
+
+  <p class="titulo-bloco">{t["g_bloco_solic"]}</p>
+  <table>
+    <tr>
+      {_campo("12", t["g_cod_operadora"], p.get("codigo_operadora", ""))}
+      {_campo("13", t["g_contratado"], p.get("contratado", ""))}
+      {_campo("14", t["g_cnes"], p.get("cnes", ""))}
+    </tr>
+    <tr>
+      {_campo("15", t["g_profissional"], v["cirurgiao"])}
+      {_campo("16", t["g_conselho"], "CRO")}
+      {_campo("17", t["g_num_conselho"], v["cro"])}
+      {_campo("18", t["g_uf"], v["uf"])}
+    </tr>
+  </table>
+
+  <p class="titulo-bloco">{t["g_bloco_intern"]}</p>
+  <table>
+    <tr>
+      {_campo("20", t["g_cod_hospital"], p.get("codigo_hospital", ""))}
+      {_campo("21", t["g_prestador"], v["hospital"])}
+    </tr>
+    <tr>
+      {_campo("22", t["g_carater"], v["carater_lbl"])}
+      {_campo("23", t["g_tipo_intern"], v["tipo_int_lbl"])}
+      {_campo("24", t["g_regime"], v["regime_lbl"])}
+      {_campo("25", t["g_diarias"], v["diarias"])}
+    </tr>
+  </table>
+
+  <table>
+    <tr>{_campo("26", t["g_indicacao"], v["indicacao"], "col4")}</tr>
+  </table>
+
+  <p class="titulo-bloco">{t["g_bloco_hipoteses"]}</p>
+  <table>
+    <tr>
+      {_campo("27", t["g_tipo_doenca"], p.get("tipo_doenca", ""))}
+      {_campo("28", t["g_tempo_doenca"], p.get("tempo_doenca", ""))}
+      {_campo("30", t["g_cid"], v["cid"])}
+      {_campo("31", t["g_cid2"], v["cid2"])}
+    </tr>
+  </table>
+
+  <p class="titulo-bloco">{t["g_bloco_procs"]}</p>
+  <table class="itens">
+    <thead>
+      <tr><th class="num">#</th><th class="cod">35 — {t["g_th_cod"]}</th><th>36 — {t["g_th_desc"]}</th><th class="qtd">37 — {t["g_th_qtd_sol"]}</th><th class="qtd">38 — {t["g_th_qtd_aut"]}</th></tr>
+    </thead>
+    <tbody>
+      {_bloco_procedimentos(p)}
+    </tbody>
+  </table>
+
+  <p class="titulo-bloco">{t["g_bloco_opme"]}</p>
+  <table class="itens">
+    <thead>
+      <tr><th class="num">#</th><th class="cod">40 — {t["g_th_cod"]}</th><th>41 — {t["g_th_desc"]}</th><th class="qtd">42 — {t["g_th_qtd"]}</th><th class="forn">43 — {t["g_th_fab"]}</th><th class="qtd">44 — {t["g_th_valor"]}</th></tr>
+    </thead>
+    <tbody>
+      {_bloco_opme(p)}
+    </tbody>
+  </table>
+
+  <table>
+    <tr>
+      {_campo("45", t["g_admissao"], v["data_proc"])}
+      {_campo("46", t["g_diarias_aut"])}
+      {_campo("47", t["g_acomodacao"])}
+    </tr>
+  </table>
+
+  <table>
+    <tr>{_campo("51", t["g_obs"], v["obs"], "col3")}</tr>
+  </table>
+
+  <table class="assinaturas">
+    <tr>
+      <td><span class="campo-num">52 — {t["g_ass_medico"]}</span>
+        <span class="assina">{_e(v["cirurgiao"])}<br><span class="muted small">CRO {_e(v["cro"])}{(" / " + _e(v["uf"])) if v["uf"] else ""}</span></span></td>
+      <td><span class="campo-num">53 — {t["g_ass_benef"]}</span><span class="assina">&nbsp;</span></td>
+      <td><span class="campo-num">54 — {t["g_ass_aut"]}</span><span class="assina">&nbsp;</span></td>
+    </tr>
+  </table>
+
+  <p class="small muted" style="margin-top:var(--sp-5)">{t["g_rodape"]}{(t["g_rodape_forn"] + _e(v["forn_txt"]) + ".") if v["forn_txt"] else ""}</p>
+
+</article>
+"""
+
+
+def _solicitud_es(p, v):
+    """A solicitud de autorizacao da aseguradora (Espanha).
+
+    Nao existe na Espanha um impresso nacional unico como o TISS: cada
+    aseguradora tem o seu, e todos pedem o mesmo conjunto — asegurado, poliza,
+    CIE-10, procedimento, centro concertado, material implantavel e a firma do
+    facultativo. E' esse denominador comum que sai aqui, sem numeracao de campo
+    (a numeracao da guia brasileira vem da ANS e nao significaria nada aqui)."""
+    t = v["t"]
+    S = pedido_es.solicitud(pais_do(p))
+    return f"""
+<article class="documento guia">
+
+  <table class="guia-topo">
+    <tr>
+      <td class="operadora">{_e(v["convenio"]) or S["aseguradora"]}</td>
+      <td class="titulo-guia">{S["titulo"]}</td>
+      {_campo("", S["ref"])}
+    </tr>
+  </table>
+
+  <table>
+    <tr>
+      {_campo("", S["emision"], _data_br(time.strftime("%Y-%m-%d")))}
+      {_campo("", S["fecha_prev"], v["data_proc"])}
+    </tr>
+  </table>
+
+  <p class="titulo-bloco">{S["b_asegurado"]}</p>
+  <table>
+    <tr>
+      {_campo("", S["nombre"], v["paciente"], "col2")}
+      {_campo("", S["dni"], p.get("dni", ""))}
+      {_campo("", S["edad"], v["idade"])}
+    </tr>
+    <tr>
+      {_campo("", S["poliza"], v["carteirinha"])}
+      {_campo("", S["modalidad"], p.get("plano", ""))}
+      {_campo("", S["validez"], _data_br(p.get("validade_carteira", "")))}
+    </tr>
+  </table>
+
+  <p class="titulo-bloco">{S["b_solicitante"]}</p>
+  <table>
+    <tr>
+      {_campo("", S["facultativo"], v["cirurgiao"], "col2")}
+      {_campo("", S["colegiado"], v["cro"])}
+      {_campo("", S["colegio"], v["uf"])}
+    </tr>
+    <tr>
+      {_campo("", S["especialidad"], S["esp_valor"], "col4")}
+    </tr>
+  </table>
+
+  <p class="titulo-bloco">{S["b_centro"]}</p>
+  <table>
+    <tr>
+      {_campo("", S["centro"], v["hospital"], "col2")}
+      {_campo("", S["cod_centro"], p.get("codigo_hospital", ""))}
+    </tr>
+    <tr>
+      {_campo("", S["caracter"], v["carater_lbl"])}
+      {_campo("", S["tipo"], v["tipo_int_lbl"])}
+      {_campo("", S["regimen"], v["regime_lbl"])}
+      {_campo("", S["estancias"], v["diarias"])}
+    </tr>
+  </table>
+
+  <p class="titulo-bloco">{S["b_diag"]}</p>
+  <table>
+    <tr>
+      {_campo("", S["cie"], v["cid"])}
+      {_campo("", S["cie2"], v["cid2"])}
+      {_campo("", S["evolucion"], p.get("tempo_doenca", ""))}
+    </tr>
+    <tr>{_campo("", S["indicacion"], v["indicacao"], "col4")}</tr>
+  </table>
+
+  <p class="titulo-bloco">{S["b_procs"]}</p>
+  <table class="itens">
+    <thead>
+      <tr><th class="num">#</th><th class="cod">{S["th_cod"]}</th><th>{S["th_desc"]}</th><th class="qtd">{S["th_cant"]}</th><th class="qtd">{S["th_aut"]}</th></tr>
+    </thead>
+    <tbody>
+      {_bloco_procedimentos(p)}
+    </tbody>
+  </table>
+
+  <p class="titulo-bloco">{S["b_material"]}</p>
+  <table class="itens">
+    <thead>
+      <tr><th class="num">#</th><th class="cod">{S["th_cod"]}</th><th>{S["th_desc"]}</th><th class="qtd">{S["th_cant"]}</th><th class="forn">{S["th_fab"]}</th><th class="qtd">{S["th_importe"]}</th></tr>
+    </thead>
+    <tbody>
+      {_bloco_opme(p)}
+    </tbody>
+  </table>
+
+  <table>
+    <tr>{_campo("", S["obs"], v["obs"], "col3")}</tr>
+  </table>
+
+  <table class="assinaturas">
+    <tr>
+      <td><span class="campo-num">{S["firma_medico"]}</span>
+        <span class="assina">{_e(v["cirurgiao"])}<br><span class="muted small">Nº col. {_e(v["cro"])}{(" / " + _e(v["uf"])) if v["uf"] else ""}</span></span></td>
+      <td><span class="campo-num">{S["firma_asegurado"]}</span><span class="assina">&nbsp;</span></td>
+      <td><span class="campo-num">{S["firma_aut"]}</span><span class="assina">&nbsp;</span></td>
+    </tr>
+  </table>
+
+  <p class="small muted" style="margin-top:var(--sp-5)">{S["anexo"]} {S["rodape"]}{(S["rodape_fab"] + _e(v["forn_txt"]) + ".") if v["forn_txt"] else ""}</p>
+
+</article>
+"""
 
 
 def render_pagina(p, parte="completo"):
     """Devolve o HTML da pagina do pedido.
 
-    Sao DUAS pecas com destinos diferentes: a guia e' o formulario DA OPERADORA
-    (tem campo que so ela preenche e tres assinaturas) e o relatorio e' o anexo
-    que justifica, assinado so pelo cirurgiao. No balcao vao grampeadas; no
-    portal da operadora sobe um arquivo para cada. Por isso a mesma ficha gera
-    tres saidas: `completo`, `guia` e `relatorio`."""
+    Sao DUAS pecas com destinos diferentes: o formulario e' o impresso DA
+    OPERADORA (tem campo que so ela preenche e tres assinaturas) e o relatorio
+    e' o anexo que justifica, assinado so pelo cirurgiao. No balcao vao
+    grampeados; no portal sobe um arquivo para cada. Por isso a mesma ficha
+    gera tres saidas: `completo`, `guia` e `relatorio`.
+
+    O IDIOMA vem da instalacao (COPILOTO_IDIOMA) e o PAIS vem do pedido: uma
+    tela em espanhol pode perfeitamente emitir a guia TISS brasileira."""
     if parte not in PARTES:
         parte = "completo"
-    c = _cirurgia(p.get("tipo", ""))
-    indicacao, justificativa, conduta = montar_textos(p)
-    titulo_cirurgia = (p.get("tipo_livre") or "").strip() or c["nome"]
-
-    paciente = p.get("paciente") or "(paciente a confirmar)"
-    idade = (p.get("idade") or "").strip()
-    paciente_linha = f"{paciente}, {idade} anos" if idade else paciente
-    convenio = (p.get("convenio") or "").strip()
-    carteirinha = (p.get("carteirinha") or "").strip()
-    convenio_linha = " — carteirinha ".join([x for x in [convenio, carteirinha] if x]) or "(a confirmar)"
-    cid = (p.get("cid") or "").strip()
-    cid_desc = (p.get("cid_desc") or c.get("cid_desc") or "").strip()
-    cid_linha = " — ".join([x for x in [cid, cid_desc] if x]) or "(a confirmar pelo cirurgião)"
-    cid2 = (p.get("cid2") or "").strip()
-
-    procs_txt = "; ".join(
-        [
-            " ".join([x for x in [pr.get("desc", "").strip(), f"({pr.get('codigo')})" if pr.get("codigo") else ""] if x])
-            for pr in p.get("procedimentos", [])
-            if pr.get("desc")
-        ]
-    ) or "(a confirmar)"
-
-    exames = p.get("exames", [])
-    associados = p.get("associados", [])
-    materiais_li = "\n      ".join(
-        f"<li>{_e(m.get('desc'))} — {_e(m.get('qtd'))}</li>"
-        for m in p.get("materiais", [])
-        if m.get("desc")
-    ) or "<li>(nenhum material especificado)</li>"
-    exames_li = "\n      ".join(f"<li>{_e(x)}</li>" for x in exames) or "<li>(nenhum exame anexado)</li>"
-
-    fornecedores = [f for f in p.get("fornecedores", []) if f]
-    forn_txt = _lista_por_extenso(fornecedores)
-    data_proc = _data_br(p.get("data_procedimento", ""))
-    cirurgiao = (p.get("cirurgiao") or "Dr(a). [nome do cirurgião]").strip()
-    cro = (p.get("cro") or "(a confirmar)").strip()
-    uf = (p.get("uf") or "").strip()
-    hospital = (p.get("hospital") or "").strip()
-    obs = (p.get("observacao") or "Não necessariamente será utilizado todo OPME solicitado").strip()
+    idi = idioma()
+    pais = pais_do(p)
+    v = _valores(p, idi)
+    t = v["t"]
 
     secao_associados = ""
-    if associados:
+    if p.get("associados"):
         secao_associados = (
-            "<h2>Quadro associado</h2>\n    <ul>\n      "
-            + "\n      ".join(f"<li>{_e(a)}</li>" for a in associados)
+            f"<h2>{t['rel_associado']}</h2>\n    <ul>\n      "
+            + "\n      ".join(f"<li>{_e(a)}</li>" for a in p["associados"])
             + "\n    </ul>"
         )
 
-    carater_lbl = dict(CARATER).get(p.get("carater", "E"), "Eletiva")
-    tipo_int_lbl = dict(TIPO_INTERNACAO).get(p.get("tipo_internacao", c["tipo_internacao"]), "Cirúrgica")
-    regime_lbl = dict(REGIME).get(p.get("regime", c["regime"]), "Hospitalar")
-
     cabeca = f"""<!doctype html>
-<html lang="pt-BR">
+<html lang="{"es" if idi == "es" else "pt-BR"}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{_TITULO_PARTE[parte]} — {_e(paciente)}</title>
+<title>{_titulo_parte(parte, t)} — {_e(v["paciente"])}</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦷</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -640,14 +1028,14 @@ def render_pagina(p, parte="completo"):
     # Barra de acoes: nao sai no papel (@media print esconde .acoes-doc), entao
     # o atalho entre as pecas fica aqui e nao suja o documento impresso.
     outras = {
-        "completo": '<a class="btn btn-vazado" href="guia.html">Só a guia</a>\n  <a class="btn btn-vazado" href="relatorio.html">Só o relatório</a>',
-        "guia": '<a class="btn btn-vazado" href="relatorio.html">Ver o relatório</a>\n  <a class="btn btn-vazado" href="./">Ver os dois</a>',
-        "relatorio": '<a class="btn btn-vazado" href="guia.html">Ver a guia</a>\n  <a class="btn btn-vazado" href="./">Ver os dois</a>',
+        "completo": f'<a class="btn btn-vazado" href="guia.html">{t["btn_so_guia"]}</a>\n  <a class="btn btn-vazado" href="relatorio.html">{t["btn_so_rel"]}</a>',
+        "guia": f'<a class="btn btn-vazado" href="relatorio.html">{t["btn_ver_rel"]}</a>\n  <a class="btn btn-vazado" href="./">{t["btn_ver_dois"]}</a>',
+        "relatorio": f'<a class="btn btn-vazado" href="guia.html">{t["btn_ver_guia"]}</a>\n  <a class="btn btn-vazado" href="./">{t["btn_ver_dois"]}</a>',
     }[parte]
 
     acoes = f"""
 <div class="acoes-doc" style="margin-top:var(--sp-5)">
-  <button class="btn" onclick="window.print()">🖨️ Imprimir / salvar em PDF</button>
+  <button class="btn" onclick="window.print()">{t["btn_imprimir"]}</button>
   {outras}
 </div>
 """
@@ -656,177 +1044,58 @@ def render_pagina(p, parte="completo"):
 <article class="documento">
 
   <header>
-    <p class="rotulo">Solicitação de liberação de cirurgia</p>
-    <h1>{_e(titulo_cirurgia)}</h1>
-    <p class="small muted">Emitido em {_data_extenso()}</p>
+    <p class="rotulo">{t["rel_rotulo"]}</p>
+    <h1>{_e(v["titulo_cirurgia"])}</h1>
+    <p class="small muted">{t["rel_emitido"]}{_data_extenso(idi=idi)}</p>
   </header>
 
   <dl class="dados">
-    <div><dt>Paciente</dt><dd>{_e(paciente_linha)}</dd></div>
-    <div><dt>Convênio</dt><dd>{_e(convenio_linha)}</dd></div>
-    <div><dt>Hipótese diagnóstica</dt><dd>{_e(cid_linha)}</dd></div>
-    <div><dt>Procedimento</dt><dd>{_e(procs_txt)}</dd></div>
-    <div><dt>Hospital</dt><dd>{_e(hospital) or "(a confirmar)"}</dd></div>
-    <div><dt>Data prevista</dt><dd>{_e(data_proc) or "(a confirmar)"}</dd></div>
+    <div><dt>{t["rel_paciente"]}</dt><dd>{_e(v["paciente_linha"])}</dd></div>
+    <div><dt>{t["rel_convenio"]}</dt><dd>{_e(v["convenio_linha"])}</dd></div>
+    <div><dt>{t["rel_hipotese"]}</dt><dd>{_e(v["cid_linha"])}</dd></div>
+    <div><dt>{t["rel_procedimento"]}</dt><dd>{_e(v["procs_txt"])}</dd></div>
+    <div><dt>{t["rel_hospital"]}</dt><dd>{_e(v["hospital"]) or t["a_confirmar"]}</dd></div>
+    <div><dt>{t["rel_data"]}</dt><dd>{_e(v["data_proc"]) or t["a_confirmar"]}</dd></div>
   </dl>
 
   <section class="prosa" style="padding-block:var(--sp-5)">
-    <h2>Justificativa clínica</h2>
-    <p>{_e(justificativa)}</p>
+    <h2>{t["rel_justificativa"]}</h2>
+    <p>{_e(v["justificativa"])}</p>
 
-    <h2>Conduta proposta</h2>
-    <p>{_e(conduta)}</p>
+    <h2>{t["rel_conduta"]}</h2>
+    <p>{_e(v["conduta"])}</p>
 
     {secao_associados}
 
-    <h2>Materiais solicitados (OPME)</h2>
+    <h2>{t["rel_materiais"]}</h2>
     <ul>
-      {materiais_li}
+      {v["materiais_li"]}
     </ul>
 
-    <h2>Exames anexados</h2>
+    <h2>{t["rel_exames"]}</h2>
     <ul>
-      {exames_li}
+      {v["exames_li"]}
     </ul>
   </section>
 
   <div class="aviso">
-    <p><strong>Pendências para o cirurgião confirmar:</strong> {_e(_pendencias(p))}.</p>
+    <p><strong>{t["rel_pendencias"]}</strong> {_e(_pendencias(p, t))}.</p>
   </div>
 
   <div class="assinatura">
-    {_e(cirurgiao)}<br>
-    <span class="muted">CRO {_e(cro)}{(" / " + _e(uf)) if uf else ""}</span>
+    {_e(v["cirurgiao"])}<br>
+    <span class="muted">{"Nº col." if idi == "es" else "CRO"} {_e(v["cro"])}{(" / " + _e(v["uf"])) if v["uf"] else ""}</span>
   </div>
 
-  <p class="small muted" style="margin-top:var(--sp-6)">Minuta gerada para revisão e assinatura do cirurgião responsável.</p>
+  <p class="small muted" style="margin-top:var(--sp-6)">{t["rel_minuta"]}</p>
 
 </article>
 """
 
-    guia = f"""
-<article class="documento guia">
-
-  <table class="guia-topo">
-    <tr>
-      <td class="operadora">{_e(convenio) or "OPERADORA"}</td>
-      <td class="titulo-guia">GUIA DE SOLICITAÇÃO DE INTERNAÇÃO</td>
-      {_campo("2", "Nº da guia")}
-    </tr>
-  </table>
-
-  <table>
-    <tr>
-      {_campo("1", "Registro ANS")}
-      {_campo("3", "Data da autorização")}
-      {_campo("4", "Senha")}
-      {_campo("5", "Validade da senha")}
-      {_campo("6", "Data de emissão", _data_br(time.strftime("%Y-%m-%d")))}
-    </tr>
-  </table>
-
-  <p class="titulo-bloco">Dados do beneficiário</p>
-  <table>
-    <tr>
-      {_campo("7", "Número da carteira", carteirinha)}
-      {_campo("8", "Plano", p.get("plano", ""))}
-      {_campo("9", "Validade da carteira", _data_br(p.get("validade_carteira", "")))}
-    </tr>
-    <tr>
-      {_campo("10", "Nome", paciente)}
-      {_campo("11", "Cartão Nacional de Saúde", p.get("cns", ""), "col2")}
-    </tr>
-  </table>
-
-  <p class="titulo-bloco">Dados do contratado solicitante</p>
-  <table>
-    <tr>
-      {_campo("12", "Código na operadora / CNPJ / CPF", p.get("codigo_operadora", ""))}
-      {_campo("13", "Nome do contratado", p.get("contratado", ""))}
-      {_campo("14", "Código CNES", p.get("cnes", ""))}
-    </tr>
-    <tr>
-      {_campo("15", "Nome do profissional solicitante", cirurgiao)}
-      {_campo("16", "Conselho", "CRO")}
-      {_campo("17", "Número no conselho", cro)}
-      {_campo("18", "UF", uf)}
-    </tr>
-  </table>
-
-  <p class="titulo-bloco">Dados do contratado solicitado / dados da internação</p>
-  <table>
-    <tr>
-      {_campo("20", "Código na operadora / CNPJ", p.get("codigo_hospital", ""))}
-      {_campo("21", "Nome do prestador", hospital)}
-    </tr>
-    <tr>
-      {_campo("22", "Caráter da internação", carater_lbl)}
-      {_campo("23", "Tipo de internação", tipo_int_lbl)}
-      {_campo("24", "Regime de internação", regime_lbl)}
-      {_campo("25", "Qtde. diárias solicitadas", p.get("diarias", c["diarias"]))}
-    </tr>
-  </table>
-
-  <table>
-    <tr>{_campo("26", "Indicação clínica", indicacao, "col4")}</tr>
-  </table>
-
-  <p class="titulo-bloco">Hipóteses diagnósticas</p>
-  <table>
-    <tr>
-      {_campo("27", "Tipo de doença", p.get("tipo_doenca", ""))}
-      {_campo("28", "Tempo de doença referido", p.get("tempo_doenca", ""))}
-      {_campo("30", "CID-10 principal", cid)}
-      {_campo("31", "CID-10 (2)", cid2)}
-    </tr>
-  </table>
-
-  <p class="titulo-bloco">Procedimentos solicitados</p>
-  <table class="itens">
-    <thead>
-      <tr><th class="num">#</th><th class="cod">35 — Código</th><th>36 — Descrição</th><th class="qtd">37 — Qtde. sol.</th><th class="qtd">38 — Qtde. aut.</th></tr>
-    </thead>
-    <tbody>
-      {_bloco_procedimentos(p)}
-    </tbody>
-  </table>
-
-  <p class="titulo-bloco">OPM solicitados</p>
-  <table class="itens">
-    <thead>
-      <tr><th class="num">#</th><th class="cod">40 — Código</th><th>41 — Descrição</th><th class="qtd">42 — Qtde.</th><th class="forn">43 — Fabricante</th><th class="qtd">44 — Valor</th></tr>
-    </thead>
-    <tbody>
-      {_bloco_opme(p)}
-    </tbody>
-  </table>
-
-  <table>
-    <tr>
-      {_campo("45", "Data provável da admissão hospitalar", data_proc)}
-      {_campo("46", "Qtde. diárias autorizadas")}
-      {_campo("47", "Tipo de acomodação autorizada")}
-    </tr>
-  </table>
-
-  <table>
-    <tr>{_campo("51", "Observação", obs, "col3")}</tr>
-  </table>
-
-  <table class="assinaturas">
-    <tr>
-      <td><span class="campo-num">52 — Data e assinatura do médico solicitante</span>
-        <span class="assina">{_e(cirurgiao)}<br><span class="muted small">CRO {_e(cro)}{(" / " + _e(uf)) if uf else ""}</span></span></td>
-      <td><span class="campo-num">53 — Data e assinatura do beneficiário</span><span class="assina">&nbsp;</span></td>
-      <td><span class="campo-num">54 — Data e assinatura do responsável pela autorização</span><span class="assina">&nbsp;</span></td>
-    </tr>
-  </table>
-
-  <p class="small muted" style="margin-top:var(--sp-5)">Guia preenchida pelo Copiloto a partir dos dados informados pelo cirurgião. Confira os códigos na tabela da operadora antes de protocolar.{(" Fornecedores indicados: " + _e(forn_txt) + ".") if forn_txt else ""}</p>
-
-</article>
-"""
-
+    # Brasil e' o unico com formulario proprio (a guia TISS/ANS). Todo o resto
+    # sai na Solicitud de Autorizacion — por isso a comparacao e' contra "br" e
+    # nao contra a lista de paises hispanos: pais novo entra sem tocar aqui.
+    guia = _guia_br(p, v) if pais == "br" else _solicitud_es(p, v)
     corpo = {"completo": relatorio + guia, "guia": guia, "relatorio": relatorio}[parte]
     return cabeca + acoes + corpo + "\n</body>\n</html>\n"
 
@@ -869,12 +1138,24 @@ def ler_pedido(sites_dir, nome):
         return None
 
 
+def _fornecedores_de(pais):
+    return FORNECEDORES_PADRAO if pais == "br" else pedido_es.FABRICANTES_ES
+
+
 def normalizar(b):
     """Aceita tanto o JSON da tela quanto o que a habilidade monta no WhatsApp,
     e devolve o pedido com os defaults do tipo de cirurgia preenchidos."""
-    c = _cirurgia(b.get("tipo", ""))
+    idi = idioma()
+    c = _cirurgia(b.get("tipo", ""), idi)
+    pais = (b.get("pais") or pais_padrao()).strip().lower()
+    pais = pais if pais in PAISES else "br"
+    _do_catalogo = not b.get("procedimentos")
     p = {
         "tipo": c["key"],
+        # O pais e' do PEDIDO, nao da instalacao: a mesma cirurgia pode ir para
+        # um convenio brasileiro hoje e para uma aseguradora hispana amanha.
+        "pais": pais,
+        "dni": (b.get("dni") or "").strip(),
         "tipo_livre": (b.get("tipo_livre") or "").strip(),
         "paciente": (b.get("paciente") or "").strip(),
         "idade": (b.get("idade") or "").strip(),
@@ -908,10 +1189,15 @@ def normalizar(b):
         "indicacao": (b.get("indicacao") or "").strip(),
         "justificativa": (b.get("justificativa") or "").strip(),
         "conduta": (b.get("conduta") or "").strip(),
-        "fornecedores": [f for f in (b.get("fornecedores") or FORNECEDORES_PADRAO) if f][:3],
+        "fornecedores": [f for f in (b.get("fornecedores") or _fornecedores_de(pais)) if f][:3],
         "procedimentos": [
             {
-                "codigo": (pr.get("codigo") or "").strip(),
+                # O codigo do catalogo e' TUSS, que so' existe no Brasil. Fora
+                # dele o nomenclator e' outro (cada aseguradora tem o seu),
+                # entao o campo vai VAZIO e entra nas pendencias — pela mesma
+                # razao de sempre: codigo inventado e' pior que campo em
+                # branco. Codigo que o proprio cirurgiao mandou e' respeitado.
+                "codigo": "" if (_do_catalogo and pais != "br") else (pr.get("codigo") or "").strip(),
                 "desc": (pr.get("desc") or "").strip(),
                 "qtd": (pr.get("qtd") or "01").strip(),
             }
@@ -928,12 +1214,26 @@ def normalizar(b):
 # ============================================================== TELA (/crm/pedido)
 # Formulario clicavel. O cirurgiao escolhe o tipo de cirurgia e o resto ja vem
 # preenchido do catalogo — ele confere, ajusta e gera. Nada de digitar do zero.
+def form_page(idi=None):
+    """A tela, com os rotulos do idioma em vigor.
+
+    Os textos vivem no dicionario (pedido_es.TEXTOS) e entram aqui por @@chave@@
+    — nao ha uma segunda copia do HTML em espanhol para sair de sincronia. Uma
+    chave que nao existir fica visivel na tela de proposito: erro de traducao
+    tem que aparecer para quem esta testando, nao virar espaco em branco."""
+    idi = idi or idioma()
+    t = dict(T(idi))
+    t["_lang"] = "es" if idi == "es" else "pt-BR"
+    t["_pais_padrao"] = pais_padrao()
+    return re.sub(r"@@([a-z_][a-z0-9_]*)@@", lambda m: str(t.get(m.group(1), m.group(0))), FORM_PAGE)
+
+
 FORM_PAGE = """<!doctype html>
-<html lang="pt-BR">
+<html lang="@@_lang@@">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pedido de cirurgia — Copiloto</title>
+<title>@@tela_titulo@@ — Copiloto</title>
 <style>
 :root{--bg:#0e131a;--panel:#151c26;--panel-2:#1c2531;--line:#293445;--ink:#e7ecf3;--ink-soft:#98a7b8;--brand:#0e5aa7;--ok:#1e8e5a}
 *{box-sizing:border-box}
@@ -981,12 +1281,12 @@ header .sub{font-size:12px;color:var(--ink-soft)}
 <body>
 <header>
   <div>
-    <h1>Pedido de cirurgia</h1>
-    <div class="sub">clique no que se aplica — o resto vem preenchido e você só confere</div>
+    <h1>@@tela_titulo@@</h1>
+    <div class="sub">@@tela_sub@@</div>
   </div>
   <div style="display:flex;gap:8px">
-    <a class="btn btn-ghost" href="/documentos" style="text-decoration:none;display:inline-flex;align-items:center">📄 Documentos</a>
-    <a class="btn btn-ghost" href="/crm" style="text-decoration:none;display:inline-flex;align-items:center">← CRM</a>
+    <a class="btn btn-ghost" href="/documentos" style="text-decoration:none;display:inline-flex;align-items:center">@@nav_docs@@</a>
+    <a class="btn btn-ghost" href="/crm" style="text-decoration:none;display:inline-flex;align-items:center">@@nav_crm@@</a>
   </div>
 </header>
 
@@ -995,101 +1295,108 @@ header .sub{font-size:12px;color:var(--ink-soft)}
   <div class="resultado sumiu" id="resultado"></div>
 
   <div class="bloco">
-    <h2>1 · Tipo de cirurgia</h2>
+    <h2>@@b_pais@@</h2>
+    <p class="dica">@@b_pais_dica@@</p>
+    <div class="chips" id="chipsPais"></div>
+  </div>
+
+  <div class="bloco">
+    <h2>@@b_tipo@@</h2>
     <div class="chips" id="chipsTipo"></div>
     <div class="campo sumiu" id="campoTipoLivre" style="margin-top:10px">
-      <label>Descreva a cirurgia</label><input id="fTipoLivre" placeholder="ex.: frenectomia lingual sob anestesia geral">
+      <label>@@l_tipo_livre@@</label><input id="fTipoLivre" placeholder="@@ph_tipo_livre@@">
     </div>
   </div>
 
   <div class="bloco sumiu" id="blocoMaloclusao">
-    <h2>2 · Tipo de má oclusão</h2>
+    <h2>@@b_maloclusao@@</h2>
     <div class="chips" id="chipsMaloclusao"></div>
   </div>
 
   <div class="bloco">
-    <h2>3 · Problemas associados</h2>
-    <p class="dica">entram na justificativa clínica do relatório</p>
+    <h2>@@b_associados@@</h2>
+    <p class="dica">@@d_associados@@</p>
     <div class="chips" id="chipsAssociados"></div>
   </div>
 
   <div class="bloco">
-    <h2>4 · Paciente e convênio</h2>
+    <h2>@@b_paciente@@</h2>
     <div class="linha">
-      <div class="campo" style="flex:2"><label>Nome do paciente</label><input id="fPaciente"></div>
-      <div class="campo"><label>Idade</label><input id="fIdade" inputmode="numeric"></div>
+      <div class="campo" style="flex:2"><label>@@l_paciente@@</label><input id="fPaciente"></div>
+      <div class="campo"><label>@@l_idade@@</label><input id="fIdade" inputmode="numeric"></div>
     </div>
-    <div class="campo"><label>Convênio</label><div class="chips" id="chipsConvenio"></div></div>
+    <div class="campo"><label>@@l_convenio@@</label><div class="chips" id="chipsConvenio"></div></div>
     <div class="linha">
-      <div class="campo"><label>Convênio (outro / conferir)</label><input id="fConvenio"></div>
-      <div class="campo"><label>Carteirinha</label><input id="fCarteirinha"></div>
-      <div class="campo"><label>Plano</label><input id="fPlano"></div>
-    </div>
-  </div>
-
-  <div class="bloco">
-    <h2>5 · Diagnóstico</h2>
-    <div class="linha">
-      <div class="campo"><label>CID-10 principal</label><input id="fCid"></div>
-      <div class="campo" style="flex:2"><label>Descrição do CID</label><input id="fCidDesc"></div>
-      <div class="campo"><label>CID-10 (2)</label><input id="fCid2"></div>
+      <div class="campo"><label>@@l_convenio_outro@@</label><input id="fConvenio"></div>
+      <div class="campo"><label>@@l_carteirinha@@</label><input id="fCarteirinha"></div>
+      <div class="campo"><label>@@l_plano@@</label><input id="fPlano"></div>
+      <div class="campo sumiu" id="campoDni"><label>@@l_dni@@</label><input id="fDni"></div>
     </div>
   </div>
 
   <div class="bloco">
-    <h2>6 · Procedimentos solicitados</h2>
-    <p class="dica">código da tabela da operadora — confira antes de protocolar; em branco significa "preencher na guia"</p>
+    <h2>@@b_diagnostico@@</h2>
+    <div class="linha">
+      <div class="campo"><label>@@l_cid@@</label><input id="fCid"></div>
+      <div class="campo" style="flex:2"><label>@@l_cid_desc@@</label><input id="fCidDesc"></div>
+      <div class="campo"><label>@@l_cid2@@</label><input id="fCid2"></div>
+    </div>
+  </div>
+
+  <div class="bloco">
+    <h2>@@b_procs@@</h2>
+    <p class="dica">@@d_procs@@</p>
     <div id="listaProcs"></div>
-    <button class="mini" id="btnAddProc">+ procedimento</button>
+    <button class="mini" id="btnAddProc">@@add_proc@@</button>
   </div>
 
   <div class="bloco">
-    <h2>7 · Hospital e internação</h2>
+    <h2>@@b_hospital@@</h2>
     <div class="linha">
-      <div class="campo" style="flex:2"><label>Hospital</label><input id="fHospital"></div>
-      <div class="campo"><label>Data do procedimento</label><input id="fData" type="date"></div>
+      <div class="campo" style="flex:2"><label>@@l_hospital@@</label><input id="fHospital"></div>
+      <div class="campo"><label>@@l_data@@</label><input id="fData" type="date"></div>
     </div>
     <div class="linha">
-      <div class="campo"><label>Caráter</label><select id="fCarater"></select></div>
-      <div class="campo"><label>Tipo de internação</label><select id="fTipoInternacao"></select></div>
-      <div class="campo"><label>Regime</label><select id="fRegime"></select></div>
-      <div class="campo"><label>Diárias</label><input id="fDiarias" style="max-width:90px"></div>
+      <div class="campo"><label>@@l_carater@@</label><select id="fCarater"></select></div>
+      <div class="campo"><label>@@l_tipo_internacao@@</label><select id="fTipoInternacao"></select></div>
+      <div class="campo"><label>@@l_regime@@</label><select id="fRegime"></select></div>
+      <div class="campo"><label>@@l_diarias@@</label><input id="fDiarias" style="max-width:90px"></div>
     </div>
   </div>
 
   <div class="bloco">
-    <h2>8 · Exames anexados</h2>
+    <h2>@@b_exames@@</h2>
     <div class="chips" id="chipsExames"></div>
   </div>
 
   <div class="bloco">
-    <h2>9 · Material (OPME) e fornecedores</h2>
+    <h2>@@b_material@@</h2>
     <div id="listaMats"></div>
-    <button class="mini" id="btnAddMat">+ material</button>
+    <button class="mini" id="btnAddMat">@@add_mat@@</button>
     <div class="linha" style="margin-top:12px">
-      <div class="campo"><label>Fornecedor 1</label><input id="fForn1"></div>
-      <div class="campo"><label>Fornecedor 2</label><input id="fForn2"></div>
-      <div class="campo"><label>Fornecedor 3</label><input id="fForn3"></div>
+      <div class="campo"><label>@@l_forn@@ 1</label><input id="fForn1"></div>
+      <div class="campo"><label>@@l_forn@@ 2</label><input id="fForn2"></div>
+      <div class="campo"><label>@@l_forn@@ 3</label><input id="fForn3"></div>
     </div>
   </div>
 
   <div class="bloco">
-    <h2>10 · Solicitante</h2>
-    <p class="dica">fica guardado neste navegador e já vem preenchido no próximo pedido</p>
+    <h2>@@b_solicitante@@</h2>
+    <p class="dica">@@d_solicitante@@</p>
     <div class="linha">
-      <div class="campo" style="flex:2"><label>Cirurgião</label><input id="fCirurgiao" placeholder="Dr(a). ..."></div>
-      <div class="campo"><label>CRO</label><input id="fCro"></div>
-      <div class="campo"><label>UF</label><input id="fUf" style="max-width:80px" maxlength="2"></div>
+      <div class="campo" style="flex:2"><label>@@l_cirurgiao@@</label><input id="fCirurgiao" placeholder="@@ph_cirurgiao@@"></div>
+      <div class="campo"><label>@@l_conselho@@</label><input id="fCro"></div>
+      <div class="campo"><label>@@l_uf@@</label><input id="fUf" style="max-width:80px" maxlength="2"></div>
     </div>
-    <div class="campo"><label>Observação (campo 51 da guia)</label><input id="fObs"></div>
+    <div class="campo"><label>@@l_obs@@</label><input id="fObs"></div>
   </div>
 
   <details class="bloco">
-    <summary style="cursor:pointer;font-size:12px;color:#98a7b8;text-transform:uppercase;letter-spacing:.05em;font-weight:650">11 · Textos do relatório (opcional — o Copiloto já escreve)</summary>
+    <summary style="cursor:pointer;font-size:12px;color:#98a7b8;text-transform:uppercase;letter-spacing:.05em;font-weight:650">@@b_textos@@</summary>
     <div style="margin-top:12px">
-      <div class="campo"><label>Indicação clínica (campo 26 da guia)</label><textarea id="fIndicacao" placeholder="deixe vazio para o Copiloto escrever"></textarea></div>
-      <div class="campo"><label>Justificativa clínica</label><textarea id="fJustificativa" placeholder="deixe vazio para o Copiloto escrever"></textarea></div>
-      <div class="campo"><label>Conduta proposta</label><textarea id="fConduta" placeholder="deixe vazio para o Copiloto escrever"></textarea></div>
+      <div class="campo"><label>@@l_indicacao@@</label><textarea id="fIndicacao" placeholder="@@ph_vazio@@"></textarea></div>
+      <div class="campo"><label>@@l_justificativa@@</label><textarea id="fJustificativa" placeholder="@@ph_vazio@@"></textarea></div>
+      <div class="campo"><label>@@l_conduta@@</label><textarea id="fConduta" placeholder="@@ph_vazio@@"></textarea></div>
     </div>
   </details>
 
@@ -1097,14 +1404,14 @@ header .sub{font-size:12px;color:var(--ink-soft)}
 </div>
 
 <div class="barra">
-  <button class="btn btn-ghost" id="btnLimpar">Limpar</button>
-  <button class="btn" id="btnGerar">Gerar pedido</button>
+  <button class="btn btn-ghost" id="btnLimpar">@@btn_limpar@@</button>
+  <button class="btn" id="btnGerar">@@btn_gerar@@</button>
 </div>
 
 <script>
 let CAT = null;
 let editando = null;           // nome do site quando veio de ?editar=
-const sel = {tipo: "ortognatica", maloclusao: "", associados: new Set(), exames: new Set()};
+const sel = {pais: "@@_pais_padrao@@", tipo: "ortognatica", maloclusao: "", associados: new Set(), exames: new Set()};
 const $ = (id) => document.getElementById(id);
 
 function chip(texto, ativo, onclick){
@@ -1114,6 +1421,50 @@ function chip(texto, ativo, onclick){
   b.textContent = texto;
   b.onclick = () => onclick(b);
   return b;
+}
+
+// Trocar o pais troca o FORMULARIO que sai no fim: guia TISS no Brasil,
+// solicitud de autorizacion nos paises hispanos. Na tela muda so' a lista de
+// seguradoras, a de fabricantes e o campo de documento — os dados clinicos
+// sao os mesmos, e por isso nao se perde nada ao trocar no meio.
+function aplicaPais(pais, trocarListas){
+  sel.pais = pais;
+  [...$("chipsPais").children].forEach(b => b.classList.toggle("on", b.dataset.pais === pais));
+  $("campoDni").classList.toggle("sumiu", pais === "br");
+  if (trocarListas) {
+    const forn = (CAT.fornecedores_por_pais || {})[pais] || CAT.fornecedores || [];
+    $("fForn1").value = forn[0] || "";
+    $("fForn2").value = forn[1] || "";
+    $("fForn3").value = forn[2] || "";
+    // A seguradora escolhida so' e' apagada se nao existir no pais novo — quem
+    // digitou "Particular" ou um nome proprio nao perde o que escreveu.
+    const lista = (CAT.convenios_por_pais || {})[pais] || [];
+    const atual = $("fConvenio").value;
+    if (atual && (CAT.convenios_por_pais || {}).br && Object.values(CAT.convenios_por_pais)
+        .some(l => l.includes(atual)) && !lista.includes(atual)) {
+      $("fConvenio").value = "";
+    }
+    ajustaCodigosPorPais();
+  }
+  montaChips();
+}
+
+// Codigo TUSS so' existe no Brasil. Ao sair do Brasil os codigos que vieram do
+// catalogo somem da tela (o nomenclator de la' e' outro, e codigo inventado e'
+// pior que campo em branco); ao voltar, reaparecem. O que o cirurgiao digitou a
+// mao nunca e' apagado nem sobrescrito.
+function ajustaCodigosPorPais(){
+  const c = CAT.cirurgias.find(x => x.key === sel.tipo) || {};
+  const doCatalogo = (c.procedimentos || []).map(pr => pr.codigo || "").filter(Boolean);
+  [...$("listaProcs").children].forEach((d, i) => {
+    const inp = d.querySelector(".cod");
+    if (sel.pais !== "br") {
+      if (doCatalogo.includes(inp.value)) inp.value = "";
+    } else if (!inp.value) {
+      const pr = (c.procedimentos || [])[i];
+      if (pr && pr.codigo) inp.value = pr.codigo;
+    }
+  });
 }
 
 function pintaTipo(key){
@@ -1139,12 +1490,13 @@ function aplicaTipo(key, repovoar){
   $("fRegime").value = c.regime || "1";
   desenhaProcs(c.procedimentos);
   desenhaMats(c.materiais);
+  ajustaCodigosPorPais();
 }
 
 function linhaProc(pr){
   const d = document.createElement("div");
   d.className = "item-lista";
-  d.innerHTML = '<input class="cod" placeholder="código"><input class="desc" placeholder="procedimento"><input class="qtd" placeholder="qtd">';
+  d.innerHTML = '<input class="cod" placeholder="@@ph_codigo@@"><input class="desc" placeholder="@@ph_proc@@"><input class="qtd" placeholder="@@ph_qtd@@">';
   const rm = document.createElement("button");
   rm.className = "mini"; rm.type = "button"; rm.textContent = "✕";
   rm.onclick = () => d.remove();
@@ -1158,7 +1510,7 @@ function linhaProc(pr){
 function linhaMat(m){
   const d = document.createElement("div");
   d.className = "item-lista";
-  d.innerHTML = '<input class="desc" placeholder="material"><input class="qtd" placeholder="qtd">';
+  d.innerHTML = '<input class="desc" placeholder="@@ph_material@@"><input class="qtd" placeholder="@@ph_qtd@@">';
   const rm = document.createElement("button");
   rm.className = "mini"; rm.type = "button"; rm.textContent = "✕";
   rm.onclick = () => d.remove();
@@ -1197,8 +1549,10 @@ function coleta(){
     qtd: d.querySelector(".qtd").value,
   })).filter(x => x.desc);
   return {
+    pais: sel.pais,
     tipo: sel.tipo,
     tipo_livre: $("fTipoLivre").value,
+    dni: $("fDni").value,
     paciente: $("fPaciente").value,
     idade: $("fIdade").value,
     convenio: $("fConvenio").value,
@@ -1230,7 +1584,9 @@ function coleta(){
 }
 
 function preenche(p){
+  aplicaPais(p.pais || "br", false);
   aplicaTipo(p.tipo || "ortognatica", false);
+  $("fDni").value = p.dni || "";
   $("fTipoLivre").value = p.tipo_livre || "";
   $("fPaciente").value = p.paciente || "";
   $("fIdade").value = p.idade || "";
@@ -1280,7 +1636,8 @@ function montaChips(){
     b.classList.toggle("on");
   })));
   const cc = $("chipsConvenio"); cc.innerHTML = "";
-  CAT.convenios.forEach(c => cc.appendChild(chip(c, $("fConvenio").value === c, (b) => {
+  const listaConv = (CAT.convenios_por_pais || {})[sel.pais] || CAT.convenios;
+  listaConv.forEach(c => cc.appendChild(chip(c, $("fConvenio").value === c, (b) => {
     $("fConvenio").value = c;
     [...cc.children].forEach(x => x.classList.remove("on"));
     b.classList.add("on");
@@ -1311,9 +1668,9 @@ function aplicaLembrado(){
 
 async function gerar(){
   const p = coleta();
-  if (!p.paciente.trim()) { $("status").textContent = "Falta o nome do paciente."; $("fPaciente").focus(); return; }
+  if (!p.paciente.trim()) { $("status").textContent = "@@s_falta_paciente@@"; $("fPaciente").focus(); return; }
   $("btnGerar").disabled = true;
-  $("status").textContent = "Gerando...";
+  $("status").textContent = "@@s_gerando@@";
   lembraSolicitante();
   try {
     const url = editando ? ("/crm/api/pedido/" + editando) : "/crm/api/pedido";
@@ -1328,16 +1685,16 @@ async function gerar(){
     // Duas peças, destinos diferentes: a guia é o formulário da operadora e o
     // relatório é o anexo que justifica. O portal costuma pedir um arquivo para
     // cada; no balcão vão grampeados — por isso as três saídas.
-    box.innerHTML = '<h2>✅ Pedido gerado</h2>' +
-      '<p style="font-size:13px;margin:.2em 0">Abrir: ' +
-      '<a href="' + destino + '/guia.html" target="_blank">só a guia</a> · ' +
-      '<a href="' + destino + '/relatorio.html" target="_blank">só o relatório</a> · ' +
-      '<a href="' + destino + '" target="_blank">os dois</a></p>' +
+    box.innerHTML = '<h2>@@r_gerado@@</h2>' +
+      '<p style="font-size:13px;margin:.2em 0">@@r_abrir@@' +
+      '<a href="' + destino + '/guia.html" target="_blank">@@r_so_guia@@</a> · ' +
+      '<a href="' + destino + '/relatorio.html" target="_blank">@@r_so_rel@@</a> · ' +
+      '<a href="' + destino + '" target="_blank">@@r_os_dois@@</a></p>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">' +
-      '<button class="btn btn-ghost" data-parte="guia">📲 Mandar a guia</button>' +
-      '<button class="btn btn-ghost" data-parte="relatorio">📲 Mandar o relatório</button>' +
-      '<button class="btn btn-ghost" data-parte="">📲 Mandar os dois</button>' +
-      '<a class="btn btn-ghost" href="/crm/pedido" style="text-decoration:none">+ Novo pedido</a></div>' +
+      '<button class="btn btn-ghost" data-parte="guia">@@r_mandar_guia@@</button>' +
+      '<button class="btn btn-ghost" data-parte="relatorio">@@r_mandar_rel@@</button>' +
+      '<button class="btn btn-ghost" data-parte="">@@r_mandar_dois@@</button>' +
+      '<a class="btn btn-ghost" href="/crm/pedido" style="text-decoration:none">@@r_novo@@</a></div>' +
       '<div class="status" id="statusZap" style="text-align:left"></div>';
     box.querySelectorAll("button[data-parte]").forEach(b => {
       b.onclick = () => mandarZap(b.dataset.parte);
@@ -1345,22 +1702,22 @@ async function gerar(){
     $("status").textContent = "";
     window.scrollTo({top: 0, behavior: "smooth"});
   } catch (e) {
-    $("status").textContent = "Não deu pra gerar: " + e.message;
+    $("status").textContent = "@@s_erro@@" + e.message;
   }
   $("btnGerar").disabled = false;
 }
 
 async function mandarZap(parte){
   const s = $("statusZap");
-  const nome = parte === "guia" ? "a guia" : (parte === "relatorio" ? "o relatório" : "o pedido completo");
-  s.textContent = "Gerando o PDF e mandando " + nome + "...";
+  const nome = parte === "guia" ? "@@z_a_guia@@" : (parte === "relatorio" ? "@@z_o_rel@@" : "@@z_completo@@");
+  s.textContent = "@@z_gerando@@" + nome + "...";
   try {
     const url = "/documentos/api/" + editando + "/send-group" + (parte ? ("?parte=" + parte) : "");
     const r = await fetch(url, {method: "POST"});
     const j = await r.json();
-    s.textContent = r.ok ? ("✅ Mandei " + nome + " no grupo principal.") : ("Não deu: " + (j.error || ""));
+    s.textContent = r.ok ? ("@@z_ok@@" + nome + "@@z_ok_fim@@") : ("@@z_nao@@" + (j.error || ""));
   } catch (e) {
-    s.textContent = "Não deu: " + e.message;
+    s.textContent = "@@z_nao@@" + e.message;
   }
 }
 
@@ -1372,6 +1729,13 @@ async function iniciar(){
     b.dataset.key = c.key;
     ct.appendChild(b);
   });
+  const cp = $("chipsPais");
+  CAT.paises.forEach(([codigo, rotulo]) => {
+    const b = chip(rotulo, false, () => aplicaPais(codigo, true));
+    b.dataset.pais = codigo;
+    cp.appendChild(b);
+  });
+
   opcoes($("fCarater"), CAT.carater);
   opcoes($("fTipoInternacao"), CAT.tipo_internacao);
   opcoes($("fRegime"), CAT.regime);
@@ -1385,11 +1749,12 @@ async function iniciar(){
     if (r.ok) {
       editando = q;
       preenche(await r.json());
-      $("status").textContent = "Editando um pedido já gerado — gerar de novo substitui a página dele.";
+      $("status").textContent = "@@s_editando@@";
       aplicaLembrado();
       return;
     }
   }
+  aplicaPais(sel.pais, true);
   aplicaTipo("ortognatica", true);
   montaChips();
   aplicaLembrado();

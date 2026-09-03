@@ -1,0 +1,46 @@
+# Frases de "sigo trabajando" — ESPANHOL, tom de secretario clinico.
+#
+# Gemea do status_phrases.yaml (PT-BR). O cont-init escolhe uma das duas pelo
+# COPILOTO_IDIOMA da stack: sem este arquivo, uma instalacao em espanhol
+# recebia "ainda estou nisso" no meio da conversa em espanhol.
+#
+# Duas categorias, e so' essas duas existem (gateway/status_phrases.py:
+# classify_status_context): "status" = o heartbeat de tarefa longa;
+# "generic" = o resto do chatter de status.
+#
+# Regra ao editar: frase curta, humana, sem jargao, sem prometer prazo. Ela
+# aparece SOZINHA no grupo, no meio de uma tarefa demorada.
+mode: replace
+
+status:
+- sigo en ello
+- continúo trabajando aquí
+- esta parte tarda un poco, pero va avanzando
+- todavía lo estoy montando
+- no me he colgado, sigo procesando
+- todavía lo estoy revisando
+- sigo con la tarea
+- va saliendo, solo que tarda
+- aún trabajando en esto
+- dejando que termine bien
+- sigo aquí, ya casi
+- todavía procesando
+- esta etapa es más lenta, pero está corriendo
+- todavía ordenando las cosas
+- sigo aquí, trabajando
+- un poquito más
+- terminando todavía
+- sigo contigo, ya cerrando
+- esta pide un minuto más
+- todavía escribiendo
+- va caminando, no me he parado
+
+generic:
+- un momento
+- ya voy
+- dame un segundo
+- enseguida
+- lo estoy viendo
+- perfecto, lo preparo
+- de acuerdo, me pongo con ello
+- anotado, lo hago ahora

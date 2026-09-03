@@ -430,10 +430,18 @@ if mudou:
     print("[config] acrescentado: " + ", ".join(mudou))
 PY
 
-# Frases de "ainda trabalhando" em PT-BR — NOSSAS, sobrescritas a cada boot
-# (mesma regra do CLAUDE.md e do _kit). Sem este arquivo o heartbeat sai em
-# ingles, com nome de ferramenta junto.
-[ -f /opt/copiloto/status_phrases.yaml ] && cp /opt/copiloto/status_phrases.yaml "$DATA/status_phrases.yaml" || true
+# Frases de "ainda trabalhando" — NOSSAS, sobrescritas a cada boot (mesma
+# regra do CLAUDE.md e do _kit). Sem este arquivo o heartbeat sai em ingles,
+# com nome de ferramenta junto.
+#
+# COPILOTO_IDIOMA=es troca o catalogo inteiro: numa instalacao em espanhol uma
+# frase solta em portugues no meio da conversa e' tao estranha quanto a em
+# ingles — e' o mesmo defeito, so que menos obvio para quem construiu.
+FRASES=/opt/copiloto/status_phrases.yaml
+case "$(printf %s "${COPILOTO_IDIOMA:-pt}" | tr A-Z a-z)" in
+  es*) [ -f /opt/copiloto/status_phrases_es.yaml ] && FRASES=/opt/copiloto/status_phrases_es.yaml ;;
+esac
+[ -f "$FRASES" ] && cp "$FRASES" "$DATA/status_phrases.yaml" || true
 
 # Cerebro — reconciliado a CADA boot, como o Composio: o config.yaml so nasce
 # no primeiro boot, entao sem isto quem ja tinha instalacao no ar colaria a

@@ -1,6 +1,6 @@
 ---
 name: pedido-cirurgia
-description: Monta o pedido de cirurgia completo (guia de solicitação de internação no padrão TISS + relatório de justificativa) a partir do tipo de cirurgia, má oclusão, problemas associados, convênio, hospital, exames, material, fornecedor, quantidade e data. Use quando pedirem "faz o pedido da cirurgia", "monta a guia do convênio", "solicitação de internação", "pedido de OPME" ou quando mandarem os dados de um paciente para liberar procedimento.
+description: Monta o pedido de cirurgia completo (guia de solicitação de internação no padrão TISS no Brasil, ou Solicitud de Autorización na Venezuela e na Espanha, + relatório de justificativa) a partir do tipo de cirurgia, má oclusão, problemas associados, convênio, hospital, exames, material, fornecedor, quantidade e data. Use quando pedirem "faz o pedido da cirurgia", "monta a guia do convênio", "solicitação de internação", "pedido de OPME" ou quando mandarem os dados de um paciente para liberar procedimento.
 tags: [convenio, guia, tiss, pedido, cirurgia, opme, internacao]
 version: 1.0.0
 ---
@@ -66,10 +66,24 @@ Ele responde `{"ok": true, "nome": "pedido-guilherme-mickosz", "url": "https://.
 `ortognatica`, `saos`, `terceiros-molares`, `enxerto-osseo`, `implantes`, `seio-maxilar`,
 `atm`, `trauma`, `patologia`, `outra` (com `tipo_livre` descrevendo).
 
+**`pais`** — qual formulário sai no fim. `br` (padrão) gera a **guia TISS/ANS**;
+`ve` e `es` geram a **Solicitud de Autorización de Intervención Quirúrgica**, que é o
+impresso que as seguradoras hispano-americanas esperam (sem numeração da ANS, com nº de
+apólice, documento de identidade e nº de colegiado no lugar de carteirinha e CRO).
+
+Não pergunte o país a cada pedido: **use o do pedido anterior** — quem opera num país
+opera nele quase sempre. Só pergunte se ele citar uma seguradora de outro país, ou na
+primeira vez. Com `pais` diferente de `br`, mande também `dni` (documento do paciente)
+quando ele informar.
+
+O **idioma** dos documentos não vem daqui: é o da instalação (`COPILOTO_IDIOMA`). Uma
+instalação em espanhol emite a guia TISS brasileira com os rótulos em espanhol, e isso
+está certo — o formulário é o do convênio, a língua é a de quem lê.
+
 **Campos opcionais** que valem a pena quando ele informar:
 `plano`, `cns`, `codigo_operadora`, `contratado`, `cnes`, `codigo_hospital`, `cid`, `cid_desc`,
 `cid2`, `carater` (`E` eletiva / `U` urgência), `tipo_internacao`, `regime`, `diarias`,
-`observacao`, `fornecedores` (lista de até 3), `procedimentos`
+`observacao`, `dni` (fora do Brasil), `fornecedores` (lista de até 3), `procedimentos`
 (`[{"codigo": "...", "desc": "...", "qtd": "01"}]`), `materiais` (`[{"desc": "...", "qtd": "02"}]`).
 
 Se ele ditou uma justificativa própria, mande em `justificativa` (e `indicacao` / `conduta`) —
